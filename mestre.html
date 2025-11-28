@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Painel do Narrador - One Piece</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        /* CSS extra só pro mestre */
+        .grid-jogadores {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 20px;
+            padding: 20px;
+        }
+        .mini-ficha {
+            background: #fff;
+            border: 2px solid #5a3a22;
+            padding: 10px;
+            border-radius: 8px;
+            box-shadow: 3px 3px 0px rgba(0,0,0,0.2);
+        }
+        .hp-bar {
+            height: 20px;
+            background: #ddd;
+            border-radius: 10px;
+            overflow: hidden;
+            margin-top: 5px;
+        }
+        .hp-fill {
+            height: 100%;
+            background: #d32f2f;
+            width: 100%;
+            transition: width 0.3s;
+        }
+    </style>
+</head>
+<body>
+    <h1>🕵️ Painel do Narrador</h1>
+    <div id="listaJogadores" class="grid-jogadores">
+        <p>Aguardando piratas conectarem...</p>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getDatabase, ref, onValue } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+
+        // USE A MESMA CONFIGURAÇÃO DO SEU APP.JS
+        const firebaseConfig = {
+            apiKey: "AIzaSyBkp8ZUYMCfRokbpMl2fBGTvfMxzzvgaeY",
+            authDomain: "rpgo-onepiece.firebaseapp.com",
+            databaseURL: "https://rpgo-onepiece-default-rtdb.firebaseio.com",
+            projectId: "rpgo-onepiece",
+            storageBucket: "rpgo-onepiece.firebasestorage.app",
+            messagingSenderId: "726770644982",
+            appId: "1:726770644982:web:7c06f46940cc5142c3f9d7"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+
+        // O Mestre escuta a pasta RAIZ "jogadores"
+        const todosRef = ref(db, 'jogadores');
+        const divLista = document.getElementById('listaJogadores');
+
+        onValue(todosRef, (snapshot) => {
+            divLista.innerHTML = ""; // Limpa a tela pra redesenhar
+            const dados = snapshot.val();
+
+            if(dados) {
+                // Transforma o objeto de objetos em um Array para gente poder fazer loop
+                // (Object.entries pega chave e valor)
+                Object.entries(dados).forEach(([id, ficha]) => {
+                    
+                    // Calcula % de vida pra barra
+                    const porcentagemVida = (ficha.hp / ficha.hpMax) * 100;
+
+                    // Cria o HTML de cada jogador
+                    const htmlCard = `
+                        <div class="mini-ficha">
+                            <h3>🏴‍☠️ ${ficha.nome || id}</h3>
+                            <p><strong>HP:</strong> ${ficha.hp} / ${ficha.hpMax}</p>
+                            <div class="hp-bar">
+                                <div class="hp-fill" style="width: ${porcentagemVida}%"></div>
+                            </div>
+                            <p>⚡ Stamina: ${ficha.stamina}</p>
+                            <hr>
+                            <p><small>Ação Padrão:</small><br> ${ficha.acaoPadrao || "..."}</p>
+                        </div>
+                    `;
+                    divLista.innerHTML += htmlCard;
+                });
+            } else {
+                divLista.innerHTML = "<p>Nenhum jogador encontrado no banco.</p>";
+            }
+        });
+    </script>
+</body>
+</html>

@@ -1,20 +1,70 @@
 <!DOCTYPE html>
 <html lang="pt-br">
+
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Projeto RPG One Piece</title>
+    <title>Login | OPRPG</title>
     <link rel="stylesheet" href="style.css">
-</head>
-<body>
-
-    <div class="container">
-        <h1>🏴‍☠️ One Piece RPG - Protótipo</h1>
-        <p>Status do Sistema: <span id="status">Carregando...</span></p>
+    <style>
+        /* Um CSS básico pra centralizar tudo */
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            font-family: sans-serif;
+            background-color: #f4e4bc;
+        }
+        .login-container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+            width: 300px;
+            text-align: center;
+            border: 2px solid #5a3a22;
+        }
+        input {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            box-sizing: border-box; /* Garante que o padding não estoure a largura */
+        }
+        button {
+            padding: 10px 20px;
+            cursor: pointer;
+            border: none;
+            border-radius: 5px;
+            color: white;
+            font-weight: bold;
+        }
+        #btnLogin { background-color: #d32f2f; }
+        #btnLogin:hover { background-color: #b71c1c; }
         
-        <button id="btnTeste">Testar Conexão</button>
+        #btnCriarConta { background-color: #555; }
+        #btnCriarConta:hover { background-color: #333; }
+    </style>
+</head>
+
+<body>
+    <div class="login-container">
+        <h1>🏴‍☠️ Login OPRPG</h1>
+        
+        <label for="email" style="display:block; text-align:left;">Email:</label>
+        <input type="email" id="email" placeholder="seu@email.com">
+
+        <label for="password" style="display:block; text-align:left;">Senha:</label>
+        <input type="password" id="password" placeholder="******">
+
+        <div style="display: flex; gap: 10px; margin-top: 20px; justify-content: center;">
+            <button id="btnLogin">Entrar</button>
+            <button id="btnCriarConta">Criar Conta</button>
+        </div>
+        
+        <p id="msgErro" style="color: red; margin-top: 15px; font-size: 0.9em;"></p>
     </div>
 
-    <script type="module" src="app.js"></script>
+    <script type="module" src="auth.js"></script>
+
 </body>
 </html>

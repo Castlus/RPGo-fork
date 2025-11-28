@@ -1,20 +1,222 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+
+:root {
+    --primary: #5a3a22; /* Marrom pirata */
+    --bg-page: #f0f2f5;
+    --bg-card: #ffffff;
+    --text-main: #2c3e50;
+    --text-sec: #7f8c8d;
+    
+    /* Cores das Ações (Baseado na imagem) */
+    --color-padrao: #3498db; /* Azul */
+    --color-bonus: #f1c40f;  /* Amarelo */
+    --color-power: #e67e22;  /* Laranja */
+    --color-react: #2ecc71;  /* Verde */
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
 body {
-    background-color: #f4e4bc; /* Cor de pergaminho */
-    font-family: 'Courier New', Courier, monospace;
-    text-align: center;
-    padding-top: 50px;
+    font-family: 'Inter', sans-serif;
+    background-color: var(--bg-page);
+    color: var(--text-main);
+    height: 100vh;
+    display: flex;
+    justify-content: center;
 }
 
-button {
-    padding: 15px 30px;
-    background-color: #d32f2f;
-    color: white;
-    border: none;
-    font-size: 16px;
-    cursor: pointer;
+/* Layout Principal: Sidebar Esquerda + Conteúdo Direita */
+.layout-container {
+    display: grid;
+    grid-template-columns: 320px 1fr; /* Lateral fixa, resto fluido */
+    gap: 30px;
+    width: 100%;
+    max-width: 1400px;
+    padding: 30px;
+    height: 100vh;
+    overflow: hidden; /* Evita scroll duplo */
+}
+
+/* --- SIDEBAR (Ficha do Personagem) --- */
+.sidebar {
+    background: var(--bg-card);
+    border-radius: 16px;
+    padding: 25px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    height: 100%;
+    overflow-y: auto;
+}
+
+.profile-header { text-align: center; }
+.avatar-circle {
+    width: 100px; height: 100px;
+    background: #ddd; border-radius: 50%;
+    margin: 0 auto 15px;
+    border: 3px solid var(--color-power);
+    overflow: hidden;
+}
+.avatar-circle img { width: 100%; height: 100%; object-fit: cover; }
+
+.char-name { font-size: 1.4rem; font-weight: 700; color: #2c3e50; }
+.char-level { font-size: 0.9rem; color: var(--text-sec); }
+
+/* Barras de Status */
+.bar-group { margin-bottom: 10px; }
+.bar-label { display: flex; justify-content: space-between; font-size: 0.85rem; font-weight: 600; margin-bottom: 5px; }
+
+.progress-track {
+    background: #e0e0e0;
+    height: 10px;
     border-radius: 5px;
+    overflow: hidden;
+    position: relative;
+}
+.progress-fill { height: 100%; border-radius: 5px; transition: width 0.5s; }
+
+.bar-hp .progress-fill { background: #e74c3c; } /* Vermelho */
+.bar-en .progress-fill { background: #f1c40f; } /* Amarelo */
+
+/* Grid de Atributos */
+.attr-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-top: 10px;
+}
+.attr-card {
+    background: #f8f9fa;
+    border: 1px solid #e9ecef;
+    border-radius: 8px;
+    padding: 10px;
+    text-align: center;
+}
+.attr-label { font-size: 0.7rem; color: var(--text-sec); text-transform: uppercase; letter-spacing: 1px; }
+.attr-value { font-size: 1.5rem; font-weight: 700; color: var(--primary); }
+
+/* --- ÁREA PRINCIPAL --- */
+.main-content {
+    overflow-y: auto;
+    padding-right: 10px; /* Espaço pro scroll */
 }
 
-button:hover {
-    background-color: #b71c1c;
+.tabs {
+    display: flex;
+    gap: 15px;
+    margin-bottom: 30px;
+    border-bottom: 1px solid #ddd;
+    padding-bottom: 10px;
+}
+.tab {
+    padding: 8px 16px;
+    font-weight: 600;
+    color: var(--text-sec);
+    cursor: pointer;
+    border-radius: 20px;
+}
+.tab.active {
+    background: #fff;
+    color: var(--color-power);
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+
+/* Seções de Ação */
+.section-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 15px;
+    margin-top: 30px;
+}
+.section-header h3 { font-size: 1.1rem; color: #555; }
+.badge-count { background: #eee; padding: 2px 8px; border-radius: 10px; font-size: 0.8rem; }
+
+/* Cards de Ação */
+.action-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 15px;
+}
+
+.action-card {
+    background: white;
+    border: 1px solid #eee;
+    border-radius: 12px;
+    padding: 15px;
+    position: relative;
+    transition: transform 0.2s;
+    cursor: grab;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    min-height: 120px;
+}
+.action-card:hover { transform: translateY(-3px); box-shadow: 0 5px 15px rgba(0,0,0,0.05); }
+
+/* Cores das Bordas dos Cards */
+.type-padrao { border-left: 5px solid var(--color-padrao); }
+.type-bonus { border-left: 5px solid var(--color-bonus); }
+.type-power { border-left: 5px solid var(--color-power); background: #fff8f0; } /* Fundo levemente laranja */
+.type-react { border-left: 5px solid var(--color-react); }
+
+.card-title { font-weight: 700; font-size: 1rem; margin-bottom: 5px; display: flex; align-items: center; gap: 8px; }
+.card-desc { font-size: 0.85rem; color: #666; line-height: 1.4; flex-grow: 1; }
+
+.card-tags {
+    display: flex;
+    gap: 5px;
+    margin-top: 10px;
+}
+.tag {
+    font-size: 0.75rem;
+    padding: 4px 8px;
+    border-radius: 6px;
+    font-weight: 600;
+}
+.tag-damage { background: #ffebee; color: #c62828; border: 1px solid #ffcdd2; }
+.tag-cost { background: #f3e5f5; color: #6a1b9a; border: 1px solid #e1bee7; }
+
+/* Mobile */
+@media (max-width: 768px) {
+    .layout-container { grid-template-columns: 1fr; padding: 15px; height: auto; overflow: visible; }
+    .sidebar { height: auto; margin-bottom: 20px; }
+}
+
+.modal-overlay {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: rgba(0,0,0,0.5); /* Fundo escuro transparente */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.modal-box {
+    background: white;
+    padding: 25px;
+    border-radius: 12px;
+    width: 90%;
+    max-width: 400px;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+}
+
+.modal-box label {
+    display: block;
+    margin-top: 10px;
+    font-weight: 600;
+    font-size: 0.9rem;
+    color: var(--text-sec);
+}
+
+.modal-box input, .modal-box textarea, .modal-box select {
+    width: 100%;
+    padding: 10px;
+    margin-top: 5px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    font-family: inherit;
 }
