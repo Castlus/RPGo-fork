@@ -1,4 +1,3 @@
-// 1. IMPORTAÇÕES LIMPAS
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { getDatabase, ref, onValue, push, remove, update } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
@@ -18,32 +17,35 @@ const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 const auth = getAuth(app);
 
-// 2. SEGURANÇA: Verifica se está logado
+// SEGURANÇA
 onAuthStateChanged(auth, (user) => {
     if (user) {
         carregarFicha(user.uid);
-        
-        // Configura edição de vida/mana (clique no número)
         configurarEdicao('valHp', 'hpAtual', 'maxHp', user.uid);
         configurarEdicao('valPp', 'ppAtual', 'maxPp', user.uid);
+        
+        // Inicializa a lógica da bandeja passando o user para salvar rolagem
+        configurarEdicao('valNivel', 'nivel', 'null', user.uid);
+        iniciarBandejaDados(user);
     } else {
         window.location.href = "index.html";
     }
 });
 
-// 3. FUNÇÃO PRINCIPAL
 function carregarFicha(uid) {
-    // Essa variável 'fichaRef' é vital!
     const fichaRef = ref(db, 'users/' + uid);
 
-    // --- CARREGA DADOS DO PERSONAGEM ---
+    // DADOS
     onValue(fichaRef, (snapshot) => {
         const dados = snapshot.val();
         if(!dados) return;
 
-        // SIDEBAR
         const elNome = document.getElementById('displayNome');
         if(elNome) elNome.innerText = dados.nome;
+        
+        // NOVO: Carrega o Nível (ou 1 se não tiver salvo)
+        const elNivel = document.getElementById('valNivel');
+        if(elNivel) elNivel.innerText = dados.nivel || 1;
         
         // VIDA
         const elValHp = document.getElementById('valHp');
@@ -52,27 +54,17 @@ function carregarFicha(uid) {
 
         if(elValHp) elValHp.innerText = dados.hpAtual;
         if(elMaxHp) elMaxHp.innerText = dados.hpMax;
-        
         if(elFillHp) {
             const pctHp = (dados.hpAtual / dados.hpMax) * 100;
             elFillHp.style.width = `${Math.max(0, Math.min(100, pctHp))}%`;
         }
 
-        // ENERGIA / PP
+        // PP
         const atualPP = dados.ppAtual || dados.enAtual || 0;
         const maxPP = dados.ppMax || dados.enMax || 1;
-
-        const elValPp = document.getElementById('valPp');
-        const elMaxPp = document.getElementById('maxPp');
-        const elFillPp = document.getElementById('fillPp');
-
-        if(elValPp) elValPp.innerText = atualPP;
-        if(elMaxPp) elMaxPp.innerText = maxPP;
-        
-        if(elFillPp) {
-            const pctPp = (atualPP / maxPP) * 100;
-            elFillPp.style.width = `${Math.max(0, Math.min(100, pctPp))}%`;
-        }
+        document.getElementById('valPp').innerText = atualPP;
+        document.getElementById('maxPp').innerText = maxPP;
+        document.getElementById('fillPp').style.width = `${Math.max(0, Math.min(100, (atualPP / maxPP) * 100))}%`;
 
         // ATRIBUTOS
         if(dados.atributos) {
@@ -89,18 +81,15 @@ function carregarFicha(uid) {
         }
     });
 
-    // --- CARDS DE AÇÃO ---
+    // AÇÕES (CARDS)
     const acoesRef = ref(db, 'users/' + uid + '/acoes');
-
     onValue(acoesRef, (snapshot) => {
         const acoes = snapshot.val();
         
-        // Limpa gavetas
         document.getElementById('lista-padrao').innerHTML = "";
         document.getElementById('lista-bonus').innerHTML = "";
         document.getElementById('lista-power').innerHTML = "";
-        const listaReact = document.getElementById('lista-react');
-        if(listaReact) listaReact.innerHTML = "";
+        document.getElementById('lista-react').innerHTML = "";
 
         if (acoes) {
             Object.entries(acoes).forEach(([id, acao]) => {
@@ -120,7 +109,6 @@ function carregarFicha(uid) {
                 if(container) container.innerHTML += cardHTML;
             });
 
-            // Re-ativar botões deletar
             document.querySelectorAll('.btn-delete').forEach(btn => {
                 btn.addEventListener('click', (e) => {
                     if(confirm("Tem certeza que quer apagar essa técnica?")) {
@@ -132,9 +120,9 @@ function carregarFicha(uid) {
         }
     });
 
-    // --- LÓGICA DE NOVA AÇÃO (MODAL 1) ---
+    // NOVA AÇÃO
     const btnSalvarAcao = document.getElementById('btnSalvarAcao');
-    const novoBtnSalvar = btnSalvarAcao.cloneNode(true); // Limpa eventos antigos
+    const novoBtnSalvar = btnSalvarAcao.cloneNode(true);
     btnSalvarAcao.parentNode.replaceChild(novoBtnSalvar, btnSalvarAcao);
 
     novoBtnSalvar.onclick = () => {
@@ -145,12 +133,8 @@ function carregarFicha(uid) {
 
         if(nome) {
             push(acoesRef, {
-                nome: nome,
-                descricao: desc,
-                tipo: tipo,
-                tag: tag
+                nome: nome, descricao: desc, tipo: tipo, tag: tag
             });
-            // Limpa e fecha
             document.getElementById('newActionName').value = "";
             document.getElementById('newActionDesc').value = "";
             document.getElementById('newActionTag').value = "";
@@ -160,35 +144,26 @@ function carregarFicha(uid) {
         }
     };
 
-    // =========================================================
-    // LÓGICA DA ENGRENAGEM / EDITAR FICHA (AGORA DENTRO DO ESCOPO!)
-    // =========================================================
+    // EDITAR FICHA
     const modalFicha = document.getElementById('modalFicha');
     const btnEditar = document.getElementById('btnEditarFicha');
     const btnFecharFicha = document.getElementById('btnFecharFicha');
     const btnSalvarFicha = document.getElementById('btnSalvarFicha');
 
-    // 1. ABRIR: Preenche os inputs com valores atuais
     if(btnEditar) btnEditar.onclick = () => {
         document.getElementById('editHpMax').value = document.getElementById('maxHp').innerText;
         document.getElementById('editPpMax').value = document.getElementById('maxPp').innerText;
-        
         document.getElementById('editFor').value = document.getElementById('attr-forca').innerText;
         document.getElementById('editDes').value = document.getElementById('attr-destreza').innerText;
         document.getElementById('editCon').value = document.getElementById('attr-constituicao').innerText;
         document.getElementById('editSab').value = document.getElementById('attr-sabedoria').innerText;
         document.getElementById('editVon').value = document.getElementById('attr-vontade').innerText;
         document.getElementById('editPre').value = document.getElementById('attr-presenca').innerText;
-
         modalFicha.style.display = 'flex';
     };
 
-    // 2. FECHAR
-    if(btnFecharFicha) btnFecharFicha.onclick = () => {
-        modalFicha.style.display = 'none';
-    };
+    if(btnFecharFicha) btnFecharFicha.onclick = () => { modalFicha.style.display = 'none'; };
 
-    // 3. SALVAR: Agora 'fichaRef' existe aqui!
     if(btnSalvarFicha) btnSalvarFicha.onclick = () => {
         const atualizacao = {
             hpMax: Number(document.getElementById('editHpMax').value),
@@ -202,50 +177,35 @@ function carregarFicha(uid) {
                 presenca: Number(document.getElementById('editPre').value)
             }
         };
-
         update(fichaRef, atualizacao).then(() => {
-            alert("Ficha atualizada com sucesso!");
+            alert("Ficha atualizada!");
             modalFicha.style.display = 'none';
-        }).catch(erro => {
-            alert("Erro ao atualizar: " + erro.message);
         });
     };
+}
 
-} // <--- FIM DA FUNÇÃO carregarFicha (IMPORTANTE!)
-
-
-// 4. OUTROS EVENTOS GLOBAIS
+// MODAIS
 const modal = document.getElementById('modalAcao');
 const btnNova = document.getElementById('btnNovaAcao');
 const btnFechar = document.getElementById('btnFecharModal');
 
-// Abrir Modal Ação
 if(btnNova) btnNova.onclick = () => { modal.style.display = 'flex'; };
-
-// Fechar Modal Ação
 if(btnFechar) btnFechar.onclick = () => { modal.style.display = 'none'; };
 
-// Botão Sair
 document.getElementById('btnSair').addEventListener('click', () => {
-    signOut(auth).then(() => {
-        window.location.href = "index.html";
-    });
+    signOut(auth).then(() => { window.location.href = "index.html"; });
 });
 
-// Lógica de Edição de Vida (Otimista)
+// EDIÇÃO OTIMISTA
 function configurarEdicao(elementoId, campoBanco, elementoMaxId, uid) {
     const spanValor = document.getElementById(elementoId);
     if(!spanValor) return; 
     
     spanValor.addEventListener('click', function() {
         const valorAtualTexto = spanValor.innerText;
-        
         const input = document.createElement('input');
-        input.type = 'text';
-        input.value = ""; 
-        input.placeholder = valorAtualTexto;
+        input.type = 'text'; input.value = ""; input.placeholder = valorAtualTexto;
         input.className = 'input-edit-stat';
-        
         spanValor.parentNode.replaceChild(input, spanValor);
         input.focus();
 
@@ -257,40 +217,293 @@ function configurarEdicao(elementoId, campoBanco, elementoMaxId, uid) {
             let novoValor = valorAtual;
 
             if (entrada === "") {
-                voltarAoTexto(spanValor, input);
+                if (input.parentNode) input.parentNode.replaceChild(spanValor, input);
                 return;
             }
-
             if (entrada.startsWith('+') || entrada.startsWith('-')) {
                 novoValor = valorAtual + Number(entrada);
             } else {
                 novoValor = Number(entrada);
             }
-
             if (novoValor > valorMax) novoValor = valorMax;
-
-            // UI Otimista
             spanValor.innerText = novoValor;
-            voltarAoTexto(spanValor, input);
+            if (input.parentNode) input.parentNode.replaceChild(spanValor, input);
 
-            update(ref(db, 'users/' + uid), {
-                [campoBanco]: novoValor
-            });
+            update(ref(db, 'users/' + uid), { [campoBanco]: novoValor });
         };
-
-        input.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') {
-                salvar();
-                input.blur(); 
-            }
-        });
-
+        input.addEventListener('keydown', (e) => { if (e.key === 'Enter') { salvar(); input.blur(); } });
         input.addEventListener('blur', salvar, { once: true });
     });
 }
 
-function voltarAoTexto(spanOriginal, inputElement) {
-    if (inputElement.parentNode) {
-        inputElement.parentNode.replaceChild(spanOriginal, inputElement);
+// =========================================================
+// 🎲 LÓGICA DA BANDEJA (SMART DOCKING)
+// =========================================================
+function iniciarBandejaDados(user) {
+    let dadosSelecionados = [];
+    let modoNegativo = false;
+    
+    // ELEMENTOS
+    const tray = document.getElementById('diceTray');
+    const header = document.getElementById('diceTrayHeader');
+    const icon = document.getElementById('trayIcon'); // Ícone da setinha
+    
+    // VARIÁVEIS DE ARRASTO
+    let isDragging = false;
+    let startX, startY, initialLeft, initialTop;
+    let hasMoved = false;
+
+    // Estado Inicial: Grudado em baixo
+    tray.classList.add('dock-bottom', 'collapsed');
+
+    // --- LÓGICA DE ARRASTAR (MOUSEDOWN) ---
+    header.addEventListener('mousedown', (e) => {
+        isDragging = true;
+        hasMoved = false;
+        startX = e.clientX;
+        startY = e.clientY;
+        
+        const rect = tray.getBoundingClientRect();
+        initialLeft = rect.left;
+        initialTop = rect.top;
+        
+        header.style.cursor = 'grabbing';
+        
+        // Remove classes de transição durante o arraste pra ficar rápido
+        tray.style.transition = 'none';
+    });
+
+    // --- MOVIMENTO (MOUSEMOVE) ---
+    document.addEventListener('mousemove', (e) => {
+        if (!isDragging) return;
+
+        const dx = e.clientX - startX;
+        const dy = e.clientY - startY;
+
+        if (Math.abs(dx) > 5 || Math.abs(dy) > 5) hasMoved = true;
+
+        // Calcula nova posição
+        let newLeft = initialLeft + dx;
+        let newTop = initialTop + dy;
+
+        // REGRA 1: NÃO SAIR DA TELA (Limbo Protection)
+        const windowWidth = window.innerWidth;
+        const windowHeight = window.innerHeight;
+        const trayWidth = tray.offsetWidth;
+        const trayHeight = tray.offsetHeight;
+
+        // Clampa (limita) os valores dentro da janela
+        newLeft = Math.max(0, Math.min(newLeft, windowWidth - trayWidth));
+        newTop = Math.max(0, Math.min(newTop, windowHeight - trayHeight));
+
+        // Aplica posição
+        tray.style.left = `${newLeft}px`;
+        tray.style.top = `${newTop}px`;
+        
+        // Remove ancoragens antigas
+        tray.style.bottom = 'auto';
+        tray.style.right = 'auto';
+    });
+
+    // --- SOLTAR (MOUSEUP) - AQUI ACONTECE A MÁGICA DO GRUDE ---
+    document.addEventListener('mouseup', () => {
+        if (!isDragging) return;
+        isDragging = false;
+        header.style.cursor = 'grab';
+        
+        // Restaura a transição suave para o efeito de "snap"
+        tray.style.transition = 'all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1)';
+
+        if (hasMoved) {
+            snapToNearestEdge();
+        }
+    });
+
+    // --- FUNÇÃO: GRUDAR NA BORDA MAIS PRÓXIMA ---
+    function snapToNearestEdge() {
+        const rect = tray.getBoundingClientRect();
+        const windowWidth = window.innerWidth;
+        const windowHeight = window.innerHeight;
+
+        // Distâncias para as bordas
+        const distLeft = rect.left;
+        const distRight = windowWidth - (rect.left + rect.width);
+        const distBottom = windowHeight - (rect.top + rect.height);
+        
+        // Define o limite de "imã" (ex: 100px). Se estiver longe de tudo, vai pro mais perto.
+        // Vamos achar o menor valor absoluto.
+        const minDist = Math.min(distLeft, distRight, distBottom);
+
+        // Limpa classes antigas de dock
+        tray.classList.remove('dock-bottom', 'dock-side');
+
+        if (minDist === distBottom) {
+            // GRUDA EM BAIXO (Modo Barra)
+            tray.classList.add('dock-bottom');
+            tray.style.top = 'auto';
+            tray.style.bottom = '0';
+            // Mantém o left atual, mas garante que não saia da tela
+            tray.style.left = `${Math.max(0, Math.min(rect.left, windowWidth - rect.width))}px`;
+            
+            // Força recolher ao grudar
+            tray.classList.add('collapsed');
+            icon.className = "fas fa-chevron-up"; // Ícone aponta pra cima
+
+        } else if (minDist === distRight) {
+            // GRUDA NA DIREITA (Modo Bolinha)
+            tray.classList.add('dock-side');
+            tray.style.left = 'auto';
+            tray.style.right = '0'; // Cola na direita
+            // Ajusta o Top pra não ficar cortado
+            let targetTop = Math.max(0, Math.min(rect.top, windowHeight - 100)); // 100 é margem
+            tray.style.top = `${targetTop}px`;
+
+            // Recolhe e vira bolinha
+            tray.classList.add('collapsed');
+            icon.className = "fas fa-dice-d20"; // Ícone vira um dado no modo bola
+
+        } else {
+            // GRUDA NA ESQUERDA (Modo Bolinha)
+            tray.classList.add('dock-side');
+            tray.style.right = 'auto';
+            tray.style.left = '0'; // Cola na esquerda
+            
+            let targetTop = Math.max(0, Math.min(rect.top, windowHeight - 100));
+            tray.style.top = `${targetTop}px`;
+
+            tray.classList.add('collapsed');
+            icon.className = "fas fa-dice-d20";
+        }
     }
+
+    // --- CLIQUE NO HEADER (ABRIR/FECHAR) ---
+    header.addEventListener('click', () => {
+        if (!hasMoved) {
+            tray.classList.toggle('collapsed');
+            
+            // Atualiza ícone dependendo do estado e posição
+            const isCollapsed = tray.classList.contains('collapsed');
+            const isSide = tray.classList.contains('dock-side');
+
+            if (isSide) {
+                // Se for lateral, vira dado quando fechado, fecha(X) ou seta quando aberto
+                icon.className = isCollapsed ? "fas fa-dice-d20" : "fas fa-times";
+            } else {
+                // Se for em baixo, vira seta
+                icon.className = isCollapsed ? "fas fa-chevron-up" : "fas fa-chevron-down";
+            }
+        }
+    });
+
+    // =========================================================
+    // LÓGICA DE ROLAGEM (IGUAL À ANTERIOR)
+    // =========================================================
+    const diceContainer = document.getElementById('diceContainer');
+    const btnToggleSign = document.getElementById('btnToggleSign');
+    const txtTotal = document.getElementById('txtTotal');
+    const txtDetalhes = document.getElementById('txtDetalhes');
+    const inputMod = document.getElementById('inputModificador');
+
+    function atualizarPreview() {
+        if(dadosSelecionados.length === 0 && Number(inputMod.value) === 0) {
+            txtDetalhes.innerText = "Selecione dados...";
+            txtTotal.innerText = "--";
+            return;
+        }
+        let formula = "";
+        dadosSelecionados.forEach((d, index) => {
+            const nomeDado = `1d${d.faces}`;
+            let operador = "";
+            if (index === 0) {
+                if (d.sinal === -1) operador = "- ";
+            } else {
+                operador = d.sinal === 1 ? " + " : " - ";
+            }
+            formula += `${operador}${nomeDado}`;
+        });
+        const mod = Number(inputMod.value);
+        if(mod !== 0) {
+            if(dadosSelecionados.length > 0) formula += mod > 0 ? ` + ${mod}` : ` - ${Math.abs(mod)}`;
+            else formula += `${mod}`;
+        }
+        txtDetalhes.innerText = formula;
+        txtTotal.innerText = "??";
+    }
+
+    btnToggleSign.addEventListener('click', () => {
+        modoNegativo = !modoNegativo;
+        if(modoNegativo) {
+            diceContainer.classList.add('negative-mode');
+            btnToggleSign.innerText = "-";
+        } else {
+            diceContainer.classList.remove('negative-mode');
+            btnToggleSign.innerText = "+";
+        }
+    });
+
+    document.querySelectorAll('.dice-btn[data-faces]').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const faces = Number(btn.getAttribute('data-faces'));
+            const sinal = modoNegativo ? -1 : 1;
+            dadosSelecionados.push({ faces, sinal });
+            if(modoNegativo) {
+                modoNegativo = false;
+                diceContainer.classList.remove('negative-mode');
+                btnToggleSign.innerText = "+";
+            }
+            atualizarPreview();
+        });
+    });
+
+    inputMod.addEventListener('input', atualizarPreview);
+
+    document.getElementById('btnLimparTray').addEventListener('click', () => {
+        dadosSelecionados = [];
+        inputMod.value = 0;
+        txtTotal.innerText = "--";
+        txtDetalhes.innerText = "Bandeja limpa";
+        modoNegativo = false;
+        diceContainer.classList.remove('negative-mode');
+        btnToggleSign.innerText = "+";
+    });
+
+    document.getElementById('btnRolarTray').addEventListener('click', () => {
+        if(dadosSelecionados.length === 0 && Number(inputMod.value) === 0) return;
+
+        let total = 0;
+        let partesTexto = [];
+
+        dadosSelecionados.forEach(d => {
+            const resultado = Math.floor(Math.random() * d.faces) + 1;
+            total += (resultado * d.sinal);
+            let resFormatado = resultado;
+            if (resultado === 1) resFormatado = `<span class="crit-fail">${resultado}</span>`;
+            else if (resultado === d.faces) resFormatado = `<span class="crit-success">${resultado}</span>`;
+            partesTexto.push({ texto: `(${resFormatado}) 1d${d.faces}`, sinal: d.sinal });
+        });
+
+        const mod = Number(inputMod.value);
+        total += mod;
+
+        let stringFinal = "";
+        partesTexto.forEach((parte, index) => {
+            let operador = "";
+            if (index === 0) {
+                if (parte.sinal === -1) operador = "- ";
+            } else {
+                operador = parte.sinal === 1 ? " + " : " - ";
+            }
+            stringFinal += `${operador}${parte.texto}`;
+        });
+
+        if (mod !== 0) stringFinal += ` ${mod >= 0 ? '+' : '-'} ${Math.abs(mod)}`;
+
+        txtTotal.innerText = total;
+        txtDetalhes.innerHTML = `[${total}] = ${stringFinal}`;
+
+        const textoLimpo = `[${total}] = ${stringFinal.replace(/<[^>]*>?/gm, '')}`;
+        if(user) update(ref(db, 'users/' + user.uid), { ultimaRolagem: textoLimpo });
+        
+        dadosSelecionados = [];
+    });
 }

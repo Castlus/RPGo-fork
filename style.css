@@ -7,7 +7,7 @@
     --text-main: #2c3e50;
     --text-sec: #7f8c8d;
     
-    /* Cores das Ações (Baseado na imagem) */
+    /* Cores das Ações */
     --color-padrao: #3498db; /* Azul */
     --color-bonus: #f1c40f;  /* Amarelo */
     --color-power: #e67e22;  /* Laranja */
@@ -20,24 +20,26 @@ body {
     font-family: 'Inter', sans-serif;
     background-color: var(--bg-page);
     color: var(--text-main);
-    height: 100vh;
+    /* Removido height: 100vh fixo pra evitar bugs de scroll com a bandeja */
+    min-height: 100vh;
     display: flex;
     justify-content: center;
 }
 
-/* Layout Principal: Sidebar Esquerda + Conteúdo Direita */
+/* Layout Principal */
 .layout-container {
     display: grid;
-    grid-template-columns: 320px 1fr; /* Lateral fixa, resto fluido */
+    grid-template-columns: 320px 1fr;
     gap: 30px;
     width: 100%;
     max-width: 1400px;
     padding: 30px;
+    /* Ajuste para não cortar conteúdo */
     height: 100vh;
-    overflow: hidden; /* Evita scroll duplo */
+    overflow: hidden;
 }
 
-/* --- SIDEBAR (Ficha do Personagem) --- */
+/* --- SIDEBAR --- */
 .sidebar {
     background: var(--bg-card);
     border-radius: 16px;
@@ -72,12 +74,11 @@ body {
     height: 10px;
     border-radius: 5px;
     overflow: hidden;
-    position: relative;
 }
 .progress-fill { height: 100%; border-radius: 5px; transition: width 0.5s; }
 
-.bar-hp .progress-fill { background: #e74c3c; } /* Vermelho */
-.bar-en .progress-fill { background: #f1c40f; } /* Amarelo */
+.bar-hp .progress-fill { background: #e74c3c; } 
+.bar-en .progress-fill { background: #f1c40f; } 
 
 /* Grid de Atributos */
 .attr-grid {
@@ -96,10 +97,11 @@ body {
 .attr-label { font-size: 0.7rem; color: var(--text-sec); text-transform: uppercase; letter-spacing: 1px; }
 .attr-value { font-size: 1.5rem; font-weight: 700; color: var(--primary); }
 
-/* --- ÁREA PRINCIPAL --- */
+/* --- CONTEÚDO PRINCIPAL --- */
 .main-content {
     overflow-y: auto;
-    padding-right: 10px; /* Espaço pro scroll */
+    padding-right: 10px;
+    padding-bottom: 80px; /* Espaço extra pra bandeja não cobrir tudo */
 }
 
 .tabs {
@@ -122,7 +124,6 @@ body {
     box-shadow: 0 2px 5px rgba(0,0,0,0.1);
 }
 
-/* Seções de Ação */
 .section-header {
     display: flex;
     align-items: center;
@@ -131,7 +132,6 @@ body {
     margin-top: 30px;
 }
 .section-header h3 { font-size: 1.1rem; color: #555; }
-.badge-count { background: #eee; padding: 2px 8px; border-radius: 10px; font-size: 0.8rem; }
 
 /* Cards de Ação */
 .action-grid {
@@ -155,98 +155,265 @@ body {
 }
 .action-card:hover { transform: translateY(-3px); box-shadow: 0 5px 15px rgba(0,0,0,0.05); }
 
-/* Cores das Bordas dos Cards */
 .type-padrao { border-left: 5px solid var(--color-padrao); }
 .type-bonus { border-left: 5px solid var(--color-bonus); }
-.type-power { border-left: 5px solid var(--color-power); background: #fff8f0; } /* Fundo levemente laranja */
+.type-power { border-left: 5px solid var(--color-power); background: #fff8f0; }
 .type-react { border-left: 5px solid var(--color-react); }
 
-.card-title { font-weight: 700; font-size: 1rem; margin-bottom: 5px; display: flex; align-items: center; gap: 8px; }
+.card-title { font-weight: 700; font-size: 1rem; margin-bottom: 5px; }
 .card-desc { font-size: 0.85rem; color: #666; line-height: 1.4; flex-grow: 1; }
 
-.card-tags {
-    display: flex;
-    gap: 5px;
-    margin-top: 10px;
-}
-.tag {
-    font-size: 0.75rem;
-    padding: 4px 8px;
-    border-radius: 6px;
-    font-weight: 600;
-}
+.card-tags { display: flex; gap: 5px; margin-top: 10px; }
+.tag { font-size: 0.75rem; padding: 4px 8px; border-radius: 6px; font-weight: 600; }
 .tag-damage { background: #ffebee; color: #c62828; border: 1px solid #ffcdd2; }
-.tag-cost { background: #f3e5f5; color: #6a1b9a; border: 1px solid #e1bee7; }
+
+/* Modais */
+.modal-overlay {
+    position: fixed; top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: rgba(0,0,0,0.5);
+    display: flex; justify-content: center; align-items: center;
+    z-index: 1000;
+}
+.modal-box {
+    background: white; padding: 25px; border-radius: 12px;
+    width: 90%; max-width: 400px;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+}
+.modal-box label { display: block; margin-top: 10px; font-weight: 600; font-size: 0.9rem; color: var(--text-sec); }
+.modal-box input, .modal-box textarea, .modal-box select {
+    width: 100%; padding: 10px; margin-top: 5px;
+    border: 1px solid #ddd; border-radius: 6px; font-family: inherit;
+}
+
+/* Edição de Status (Clicar no número) */
+.stat-values { font-family: monospace; font-size: 0.9rem; }
+.editable-num {
+    cursor: pointer; border-bottom: 1px dashed #aaa; padding: 0 2px;
+    font-weight: bold; transition: color 0.2s;
+}
+.editable-num:hover { color: var(--color-power); border-bottom-color: var(--color-power); }
+.input-edit-stat { width: 60px; font-family: monospace; font-size: 0.9rem; padding: 2px; text-align: center; }
+
+/* --- BANDEJA DE DADOS (NOVA) --- */
+.dice-tray {
+    position: fixed;
+    bottom: 0;
+    right: 20px;
+    width: 300px;
+    background: white;
+    border-radius: 12px 12px 0 0;
+    box-shadow: 0 -5px 20px rgba(0,0,0,0.15);
+    border: 1px solid #ddd;
+    z-index: 9999;
+    /* Animação suave para altura e movimento */
+    transition: height 0.3s ease; 
+    display: flex;
+    flex-direction: column;
+}
+
+/* Estado Recolhido: Cortamos a altura para mostrar só o header */
+.dice-tray.collapsed {
+    height: 45px !important; 
+    overflow: hidden;
+}
+
+.tray-header {
+    background: var(--primary);
+    color: white;
+    padding: 12px 15px;
+    cursor: grab; /* Mãozinha para arrastar */
+    font-weight: 700;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-radius: 10px 10px 0 0;
+    height: 45px;
+    user-select: none;
+}
+.tray-header:active { cursor: grabbing; }
+
+.tray-body {
+    padding: 15px;
+    background: #f8f9fa;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.dice-grid-buttons {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+}
+
+.dice-btn {
+    aspect-ratio: 1;
+    border: 2px solid #e0e0e0;
+    background: white;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 700;
+    color: #555;
+    transition: 0.2s;
+    font-size: 0.9rem;
+}
+.dice-btn:hover { border-color: var(--primary); color: var(--primary); transform: translateY(-2px); }
+
+/* MODO NEGATIVO: Pinta o container de vermelho */
+.dice-grid-buttons.negative-mode .dice-btn[data-faces] {
+    border-color: #ef9a9a;
+    background-color: #ffebee;
+    color: #c62828;
+}
+.dice-grid-buttons.negative-mode .dice-btn[data-faces]:hover {
+    background-color: #c62828;
+    color: white;
+}
+
+.sign-btn { font-size: 1.2rem; background: #e3f2fd; color: #1976d2; border-color: #bbdefb; }
+
+.tray-footer { display: flex; gap: 10px; align-items: flex-end; }
+.tray-footer input { width: 100%; padding: 8px; text-align: center; border: 1px solid #ccc; border-radius: 6px; }
+.clear-btn { background: #eee; border: none; padding: 10px; border-radius: 6px; cursor: pointer; color: #666; }
+
+.roll-btn {
+    background: var(--color-padrao); color: white; border: none; padding: 12px;
+    font-weight: 800; font-size: 1.1rem; border-radius: 8px; cursor: pointer;
+    box-shadow: 0 4px 0 #2980b9; transition: 0.1s;
+}
+.roll-btn:active { transform: translateY(4px); box-shadow: none; }
+
+/* --- BANDEJA DE DADOS (SMART DOCK) --- */
+.dice-tray {
+    position: fixed;
+    /* Tamanho padrão quando aberta */
+    width: 300px;
+    background: white;
+    box-shadow: 0 5px 25px rgba(0,0,0,0.2);
+    border: 1px solid #ddd;
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    /* Animação suave para tudo (posição, tamanho, arredondamento) */
+    transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+
+/* === ESTADOS DE DOCK (ONDE ELA ESTÁ?) === */
+
+/* 1. EM BAIXO (Padrão: Barra) */
+.dice-tray.dock-bottom {
+    border-radius: 12px 12px 0 0;
+    bottom: 0; /* Cola no chão */
+}
+.dice-tray.dock-bottom.collapsed {
+    height: 45px !important;
+    overflow: hidden;
+}
+
+/* 2. LATERAIS (Esquerda/Direita) */
+.dice-tray.dock-side {
+    top: 50%; /* Posição inicial, o JS vai mudar */
+    border-radius: 12px;
+}
+
+/* === MODO BOLINHA (QUANDO RECOLHIDA NAS LATERAIS) === */
+.dice-tray.dock-side.collapsed {
+    width: 50px !important;
+    height: 50px !important;
+    border-radius: 50%; /* Vira bola */
+    overflow: hidden;
+    border: 2px solid var(--primary);
+    box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+}
+
+/* Ajustes do Header para o modo Bolinha */
+.dice-tray.dock-side.collapsed .tray-header {
+    justify-content: center;
+    padding: 0;
+    height: 100%;
+}
+.dice-tray.dock-side.collapsed .tray-header span {
+    display: none; /* Esconde o texto "Rolador" */
+}
+.dice-tray.dock-side.collapsed .tray-header i {
+    font-size: 1.5rem; /* Aumenta o ícone */
+}
+
+/* HEADER PADRÃO */
+.tray-header {
+    background: var(--primary);
+    color: white;
+    padding: 12px 15px;
+    cursor: grab;
+    font-weight: 700;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    height: 45px;
+    user-select: none;
+    flex-shrink: 0; /* Garante que o header nunca encolha */
+}
+/* Container da esquerda (Ícone + Texto) */
+.header-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+/* Quando virar bolinha (dock-side + collapsed) */
+.dice-tray.dock-side.collapsed .tray-label {
+    display: none; /* Tchau texto "Rolador" */
+}
+
+.dice-tray.dock-side.collapsed .header-left i {
+    display: none; /* Tchau ícone decorativo da esquerda (pra não ficar duplicado) */
+}
+
+/* O ícone da direita (#trayIcon) assume o comando */
+.dice-tray.dock-side.collapsed .tray-header {
+    justify-content: center; /* Centraliza o ícone restante */
+    padding: 0;
+}
+
+.dice-tray.dock-side.collapsed #trayIcon {
+    font-size: 1.6rem; /* Deixa o ícone do dado bem grande */
+    margin: 0;
+}
+
+.tray-header:active { cursor: grabbing; }
+
+/* CORPO DA BANDEJA */
+.tray-body {
+    padding: 15px;
+    background: #f8f9fa;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    /* Garante altura máxima pra não sair da tela se tiver muitos dados */
+    max-height: 80vh; 
+    overflow-y: auto;
+}
+
+/* (Mantenha o resto do CSS dos botões e grid igual estava) */
+.dice-grid-buttons { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.dice-btn { aspect-ratio: 1; border: 2px solid #e0e0e0; background: white; border-radius: 8px; cursor: pointer; font-weight: 700; color: #555; transition: 0.2s; font-size: 0.9rem; }
+.dice-btn:hover { border-color: var(--primary); color: var(--primary); transform: translateY(-2px); }
+.dice-grid-buttons.negative-mode .dice-btn[data-faces] { border-color: #ef9a9a; background-color: #ffebee; color: #c62828; }
+.dice-grid-buttons.negative-mode .dice-btn[data-faces]:hover { background-color: #c62828; color: white; }
+.sign-btn { font-size: 1.2rem; background: #e3f2fd; color: #1976d2; border-color: #bbdefb; }
+.tray-footer { display: flex; gap: 10px; align-items: flex-end; }
+.tray-footer input { width: 100%; padding: 8px; text-align: center; border: 1px solid #ccc; border-radius: 6px; }
+.clear-btn { background: #eee; border: none; padding: 10px; border-radius: 6px; cursor: pointer; color: #666; }
+.roll-btn { background: var(--color-padrao); color: white; border: none; padding: 12px; font-weight: 800; font-size: 1.1rem; border-radius: 8px; cursor: pointer; box-shadow: 0 4px 0 #2980b9; transition: 0.1s; }
+.roll-btn:active { transform: translateY(4px); box-shadow: none; }
+.tray-result-box { background: white; border: 2px dashed #ddd; border-radius: 8px; padding: 15px; text-align: center; min-height: 80px; }
+.crit-success { color: #27ae60; font-weight: 900; text-decoration: underline; }
+.crit-fail { color: #c0392b; font-weight: 900; }
 
 /* Mobile */
 @media (max-width: 768px) {
     .layout-container { grid-template-columns: 1fr; padding: 15px; height: auto; overflow: visible; }
     .sidebar { height: auto; margin-bottom: 20px; }
-}
-
-.modal-overlay {
-    position: fixed;
-    top: 0; left: 0;
-    width: 100%; height: 100%;
-    background: rgba(0,0,0,0.5); /* Fundo escuro transparente */
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    z-index: 1000;
-}
-
-.modal-box {
-    background: white;
-    padding: 25px;
-    border-radius: 12px;
-    width: 90%;
-    max-width: 400px;
-    box-shadow: 0 10px 25px rgba(0,0,0,0.2);
-}
-
-.modal-box label {
-    display: block;
-    margin-top: 10px;
-    font-weight: 600;
-    font-size: 0.9rem;
-    color: var(--text-sec);
-}
-
-.modal-box input, .modal-box textarea, .modal-box select {
-    width: 100%;
-    padding: 10px;
-    margin-top: 5px;
-    border: 1px solid #ddd;
-    border-radius: 6px;
-    font-family: inherit;
-}
-/* --- EDIÇÃO DE STATUS --- */
-.stat-values {
-    font-family: monospace;
-    font-size: 0.9rem;
-}
-
-.editable-num {
-    cursor: pointer;
-    border-bottom: 1px dashed #aaa; /* Linha pontilhada para indicar edição */
-    padding: 0 2px;
-    font-weight: bold;
-    transition: color 0.2s;
-}
-
-.editable-num:hover {
-    color: var(--color-power);
-    border-bottom-color: var(--color-power);
-    background-color: rgba(0,0,0,0.05);
-}
-
-/* Estilo do Input que aparece quando clica */
-.input-edit-stat {
-    width: 60px;
-    font-family: monospace;
-    font-size: 0.9rem;
-    padding: 2px;
-    border: 1px solid var(--color-padrao);
-    border-radius: 4px;
-    text-align: center;
+    .dice-tray { width: 100%; right: 0; bottom: 0; border-radius: 0; }
 }
