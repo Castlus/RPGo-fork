@@ -324,10 +324,6 @@ function iniciarBandejaDados(user) {
                 // SE ERA BOLINHA: Mantém bolinha e centraliza no mouse
                 tray.style.transition = 'width 0.3s ease, height 0.3s ease, border-radius 0.3s ease';
                 icon.className = "fas fa-dice-d20"; 
-
-                // Centraliza no mouse (25, 25)
-                initialLeft = startX - 25;
-                initialTop = startY - 25;
             } else {
                 // SE ESTAVA ABERTO: Mantém aberto e segue o mouse com o offset original
                 tray.style.transition = 'none'; 
