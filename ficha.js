@@ -21,14 +21,17 @@ const auth = getAuth(app);
 onAuthStateChanged(auth, (user) => {
     if (user) {
         carregarFicha(user.uid);
+        carregarInventario(user.uid);
+        setupInventoryUI(user.uid);
+
         configurarEdicao('valHp', 'hpAtual', 'maxHp', user.uid);
         configurarEdicao('valPp', 'ppAtual', 'maxPp', user.uid);
+        configurarEdicao('maxPeso', 'cargaMaxima', 'null', user.uid);
         
         // Inicializa a lógica da bandeja passando o user para salvar rolagem
         configurarEdicao('valNivel', 'nivel', 'null', user.uid);
         iniciarBandejaDados(user);
-        iniciarChat(user);
-        configurarTema(); // <--- INICIA O TEMA
+        configurarTema();
     } else {
         window.location.href = "index.html";
     }
@@ -269,227 +272,732 @@ function configurarEdicao(elementoId, campoBanco, elementoMaxId, uid) {
 // =========================================================
 // 🎲 LÓGICA DA BANDEJA (SMART DOCKING)
 // =========================================================
-function iniciarChat(user) {
-    const tray = document.getElementById('chatTray');
-    const header = document.getElementById('chatHeader');
-    const icon = document.getElementById('chatIcon');
-    const chatLog = document.getElementById('chatLog');
-    const inputChat = document.getElementById('chatInput');
-    const btnEnviar = document.getElementById('btnEnviarChat');
-    const chatRef = ref(db, 'chat_global');
-
-    // Resizers
-    const resizeW = document.getElementById('resizeW');
-    const resizeE = document.getElementById('resizeE');
-    const resizeN = document.getElementById('resizeN');
-
-    // ESTADO INICIAL: Bola na Direita
-    tray.className = "chat-tray collapsed dock-side"; 
-    tray.style.top = "200px"; 
-    tray.style.right = "0px";
-    tray.style.left = "auto";
-    icon.className = "fas fa-comment-dots";
-
-    // --- ARRASTO ---
+function iniciarBandejaDados(user) {
+    let dadosSelecionados = [];
+    let modoNegativo = false;
+    
+    // ELEMENTOS
+    const tray = document.getElementById('diceTray');
+    const header = document.getElementById('diceTrayHeader');
+    const icon = document.getElementById('trayIcon'); // Ícone da setinha
+    
+    // VARIÁVEIS DE ARRASTO
     let isDragging = false;
+    let startX, startY, initialLeft, initialTop;
     let hasMoved = false;
-    let dragOffsetX = 0, dragOffsetY = 0;
+    let dragStartTime = 0;
 
+    // Estado Inicial: Grudado em baixo
+    tray.classList.add('dock-bottom', 'collapsed');
+
+    // --- LÓGICA DE ARRASTAR (MOUSEDOWN) ---
     header.addEventListener('mousedown', (e) => {
-        // Se estiver aberto e dockado, não arrasta pelo header
-        const isCollapsed = tray.classList.contains('collapsed');
-        const isDocked = tray.classList.contains('dock-side') || tray.classList.contains('dock-bottom');
-        if (!isCollapsed && isDocked) return;
-
         isDragging = true;
         hasMoved = false;
+        dragStartTime = Date.now();
+        startX = e.clientX;
+        startY = e.clientY;
         
         const rect = tray.getBoundingClientRect();
-        dragOffsetX = e.clientX - rect.left;
-        dragOffsetY = e.clientY - rect.top;
+        initialLeft = rect.left;
+        initialTop = rect.top;
         
         header.style.cursor = 'grabbing';
-        // NÃO removemos a transição aqui para permitir o morph Bola->Barra
-        // tray.style.transition = 'none'; 
     });
 
+    // --- MOVIMENTO (MOUSEMOVE) ---
     document.addEventListener('mousemove', (e) => {
         if (!isDragging) return;
 
-        if (!hasMoved) {
-            // Sensibilidade do arrasto
-            if (Math.abs(e.clientX - (tray.getBoundingClientRect().left + dragOffsetX)) > 5 || 
-                Math.abs(e.clientY - (tray.getBoundingClientRect().top + dragOffsetY)) > 5) {
-                 
-                 hasMoved = true;
+        const dx = e.clientX - startX;
+        const dy = e.clientY - startY;
 
-                 // === MÁGICA DA ANIMAÇÃO ===
-                 // Remove o dock-side/bottom. O CSS vai animar de Bola -> Barra automaticamente
-                 tray.classList.remove('dock-bottom', 'dock-side');
-                 
-                 // Garante que está fechado (Barra)
-                 tray.classList.add('collapsed');
-                 
-                 // Limpa tamanhos para o CSS da Barra pegar
-                 tray.style.width = ''; 
-                 tray.style.height = '';
-
-                 // Ajusta offset (O mouse estava na bola, agora está na barra)
-                 // Para não pular, centralizamos o mouse na barra
-                 icon.className = "fas fa-comment-dots";
+        // Só considera movimento se passar de 5px
+        if (!hasMoved && (Math.abs(dx) > 5 || Math.abs(dy) > 5)) {
+            hasMoved = true;
+            
+            // Verifica estado atual
+            const isCollapsed = tray.classList.contains('collapsed');
+            
+            // Remove classes de dock
+            tray.classList.remove('dock-bottom', 'dock-side');
+            
+            if (isCollapsed) {
+                tray.style.transition = 'width 0.3s ease, height 0.3s ease, border-radius 0.3s ease';
+                icon.className = "fas fa-dice-d20"; 
+            } else {
+                tray.style.transition = 'none'; 
             }
+
+            // Aplica posição inicial corrigida
+            tray.style.left = `${initialLeft}px`;
+            tray.style.top = `${initialTop}px`;
+            tray.style.bottom = 'auto';
+            tray.style.right = 'auto';
         }
 
         if (hasMoved) {
-            let newLeft = e.clientX - dragOffsetX;
-            let newTop = e.clientY - dragOffsetY;
+            // Calcula nova posição
+            let newLeft = initialLeft + dx;
+            let newTop = initialTop + dy;
 
-            // Limites da tela
-            const w = window.innerWidth;
-            const h = window.innerHeight;
-            // Pega tamanho atual (que está animando para barra)
-            const cw = 300; // Largura da barra
-            const ch = 45;  // Altura da barra
+            // REGRA 1: NÃO SAIR DA TELA
+            const windowWidth = window.innerWidth;
+            const windowHeight = window.innerHeight;
+            
+            // Usa o tamanho atual da bandeja (seja bolinha ou aberta)
+            const currentWidth = tray.offsetWidth;
+            const currentHeight = tray.offsetHeight;
 
-            newLeft = Math.max(0, Math.min(newLeft, w - cw));
-            newTop = Math.max(0, Math.min(newTop, h - ch));
+            // Clampa (limita) os valores dentro da janela
+            newLeft = Math.max(0, Math.min(newLeft, windowWidth - currentWidth));
+            newTop = Math.max(0, Math.min(newTop, windowHeight - currentHeight));
 
+            // Aplica posição
             tray.style.left = `${newLeft}px`;
             tray.style.top = `${newTop}px`;
-            tray.style.right = 'auto'; 
+            
+            // Remove ancoragens antigas
             tray.style.bottom = 'auto';
+            tray.style.right = 'auto';
         }
     });
 
+    // --- SOLTAR (MOUSEUP) ---
     document.addEventListener('mouseup', () => {
-        if (isDragging) {
-            isDragging = false;
-            header.style.cursor = 'grab';
-            if (hasMoved) snapToNearestEdge();
-            else toggleChat();
+        if (!isDragging) return;
+        isDragging = false;
+        header.style.cursor = 'grab';
+        
+        // Restaura a transição suave para o efeito de "snap"
+        tray.style.transition = 'all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1)';
+
+        if (hasMoved) {
+            snapToNearestEdge();
         }
     });
 
-    // --- SNAP (Imã) ---
+    // --- FUNÇÃO: GRUDAR NA BORDA MAIS PRÓXIMA ---
     function snapToNearestEdge() {
         const rect = tray.getBoundingClientRect();
-        const w = window.innerWidth;
-        const h = window.innerHeight;
-        
-        const distRight = w - rect.right;
+        const windowWidth = window.innerWidth;
+        const windowHeight = window.innerHeight;
+
+        // Distâncias para as bordas
         const distLeft = rect.left;
-        const distBottom = h - rect.bottom;
-        const snapLimit = 100;
+        const distRight = windowWidth - (rect.left + rect.width);
+        const distBottom = windowHeight - (rect.top + rect.height);
+        
+        const snapThreshold = 80; 
+        const safeMargin = 20;
+        const estimatedHeight = 400; // Altura estimada da bandeja aberta
 
+        // Limpa classes antigas
         tray.classList.remove('dock-bottom', 'dock-side');
-        tray.style.width = ''; tray.style.height = '';
-
-        if (distRight < snapLimit) { // Direita -> Bola
-            tray.classList.add('dock-side', 'collapsed');
-            tray.style.left = 'auto'; tray.style.right = '0';
-            tray.style.top = `${Math.max(0, Math.min(rect.top, h - 50))}px`;
-            icon.className = "fas fa-comment-dots";
-        } 
-        else if (distLeft < snapLimit) { // Esquerda -> Bola
-            tray.classList.add('dock-side', 'collapsed');
-            tray.style.right = 'auto'; tray.style.left = '0';
-            tray.style.top = `${Math.max(0, Math.min(rect.top, h - 50))}px`;
-            icon.className = "fas fa-comment-dots";
-        }
-        else if (distBottom < snapLimit) { // Baixo -> Barra
-            tray.classList.add('dock-bottom', 'collapsed');
-            tray.style.top = 'auto'; tray.style.bottom = '0';
-            let targetLeft = Math.max(0, Math.min(rect.left, w - 300));
-            tray.style.left = `${targetLeft}px`;
-            icon.className = "fas fa-chevron-up";
-        }
-    }
-
-    // --- CLIQUE ---
-    function toggleChat() {
-        const isCollapsed = tray.classList.contains('collapsed');
-        if (isCollapsed) { // Abrir
-            tray.classList.remove('collapsed');
-            if (!tray.style.width) tray.style.width = "350px"; // Default
-            if (!tray.style.height) tray.style.height = "450px";
-            
-            // Ícones
-            if (tray.classList.contains('dock-bottom')) icon.className = "fas fa-chevron-down";
-            else icon.className = "fas fa-minus";
-            
-            chatLog.scrollTop = chatLog.scrollHeight;
-        } else { // Fechar
+        
+        if (distBottom < snapThreshold) {
+            // GRUDA EM BAIXO
+            tray.classList.add('dock-bottom');
             tray.classList.add('collapsed');
-            tray.style.width = ''; tray.style.height = ''; // Limpa para CSS assumir
             
-            if (tray.classList.contains('dock-side')) icon.className = "fas fa-comment-dots";
-            else if (tray.classList.contains('dock-bottom')) icon.className = "fas fa-chevron-up";
-            else { 
-                // Se flutuando, vira Barra por padrão (comportamento rolador)
-                icon.className = "fas fa-comment-dots"; 
+            const collapsedHeight = 45; 
+            const targetTop = windowHeight - collapsedHeight;
+            
+            tray.style.bottom = 'auto'; 
+            tray.style.top = `${targetTop}px`;
+            tray.style.left = `${Math.max(0, Math.min(rect.left, windowWidth - 300))}px`;
+            tray.style.right = 'auto';
+            
+            icon.className = "fas fa-chevron-up"; 
+
+            // Depois da animação, fixa no bottom para responsividade
+            setTimeout(() => {
+                if (tray.classList.contains('dock-bottom') && !isDragging) {
+                    tray.style.top = 'auto';
+                    tray.style.bottom = '0';
+                }
+            }, 300);
+
+        } else if (distLeft < snapThreshold) {
+            // GRUDA ESQUERDA
+            tray.classList.add('dock-side');
+            tray.classList.add('collapsed');
+            
+            tray.style.right = 'auto';
+            tray.style.left = '0'; 
+            tray.style.bottom = 'auto';
+            
+            // Ajusta Top para ficar visível
+            let targetTop = Math.max(safeMargin, Math.min(rect.top, windowHeight - 100));
+            tray.style.top = `${targetTop}px`;
+
+            icon.className = "fas fa-dice-d20";
+
+        } else if (distRight < snapThreshold) {
+            // GRUDA DIREITA
+            tray.classList.add('dock-side');
+            tray.classList.add('collapsed');
+            
+            tray.style.left = 'auto';
+            tray.style.right = '0'; 
+            tray.style.bottom = 'auto';
+            
+            let targetTop = Math.max(safeMargin, Math.min(rect.top, windowHeight - 100));
+            tray.style.top = `${targetTop}px`;
+
+            icon.className = "fas fa-dice-d20";
+
+        } else {
+            // FLUTUANDO
+            
+            // Ajusta Horizontal
+            let finalLeft = rect.left;
+            if (finalLeft + 300 > windowWidth) {
+                finalLeft = windowWidth - 300 - safeMargin;
+            }
+            tray.style.left = `${Math.max(safeMargin, finalLeft)}px`;
+            tray.style.right = 'auto';
+
+            // Ajusta Vertical
+            // Expande pra CIMA se necessário
+            if (rect.top + estimatedHeight > windowHeight) {
+                const bottomPos = windowHeight - rect.bottom;
+                tray.style.bottom = `${Math.max(safeMargin, bottomPos)}px`;
+                tray.style.top = 'auto';
+            } else {
+                tray.style.top = `${rect.top}px`;
+                tray.style.bottom = 'auto';
+            }
+            
+            // Ajusta ícone conforme estado
+            if (tray.classList.contains('collapsed')) {
+                icon.className = "fas fa-dice-d20";
+            } else {
+                icon.className = "fas fa-times";
             }
         }
     }
 
-    // --- RESIZE (Mantido) ---
-    setupResize(resizeW, 'w'); setupResize(resizeE, 'e'); setupResize(resizeN, 'n'); 
-    function setupResize(handle, dir) {
-        if(!handle) return;
-        handle.addEventListener('mousedown', (e) => {
-            e.preventDefault(); e.stopPropagation();
-            const startX = e.clientX; const startY = e.clientY;
-            const startW = parseInt(document.defaultView.getComputedStyle(tray).width, 10);
-            const startH = parseInt(document.defaultView.getComputedStyle(tray).height, 10);
-            const startLeft = tray.getBoundingClientRect().left;
-            function doDrag(e) {
-                if (dir === 'w') { 
-                    const newW = startW + (startX - e.clientX);
-                    if (newW > 300 && newW < window.innerWidth - 20) {
-                        tray.style.width = newW + 'px';
-                        if (tray.style.right !== "0px") tray.style.left = `${startLeft - (startX - e.clientX)}px`;
+    // --- CLIQUE (ABRIR/FECHAR) ---
+    header.addEventListener('click', () => {
+        // Clique rápido sem arrastar
+        const clickDuration = Date.now() - dragStartTime;
+        
+        if (!hasMoved && clickDuration < 200) {
+            const willOpen = tray.classList.contains('collapsed');
+            const isFloating = !tray.classList.contains('dock-bottom') && !tray.classList.contains('dock-side');
+            const trayBody = tray.querySelector('.tray-body');
+
+            if (willOpen) {
+                // --- ABRINDO ---
+                const rect = tray.getBoundingClientRect();
+                const startHeight = tray.offsetHeight;
+                const startWidth = tray.offsetWidth;
+                
+                // Mede tamanho final
+                tray.style.transition = 'none';
+                tray.classList.remove('collapsed');
+                tray.style.height = 'auto';
+                tray.style.width = '300px';
+                tray.style.overflow = 'hidden';
+                if(trayBody) trayBody.style.overflow = 'hidden';
+                
+                const targetHeight = tray.scrollHeight;
+                
+                // Posicionamento Inteligente
+                const windowHeight = window.innerHeight;
+                const windowWidth = window.innerWidth;
+                
+                const spaceBelow = windowHeight - rect.top;
+                const spaceAbove = rect.bottom; 
+                
+                // Expande para cima se pouco espaço
+                if (spaceBelow < 350 && spaceAbove > spaceBelow) {
+                    const bottomPos = windowHeight - rect.bottom;
+                    tray.style.bottom = `${bottomPos}px`;
+                    tray.style.top = 'auto';
+                } else {
+                    tray.style.top = `${rect.top}px`;
+                    tray.style.bottom = 'auto';
+                }
+
+                // Correção Horizontal
+                if (isFloating) {
+                    const expandedWidth = 300;
+                    if (rect.left + expandedWidth > windowWidth) {
+                        const newLeft = windowWidth - expandedWidth - 10;
+                        tray.style.left = `${Math.max(0, newLeft)}px`;
                     }
                 }
-                else if (dir === 'e') {
-                    const newW = startW + (e.clientX - startX);
-                    if (newW > 300 && newW < window.innerWidth - 20) tray.style.width = newW + 'px';
+
+                // Inicia animação
+                tray.style.height = `${startHeight}px`;
+                tray.style.width = `${startWidth}px`;
+                
+                tray.offsetHeight; // Força reflow
+                
+                tray.style.transition = 'all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1)';
+                tray.style.height = `${targetHeight}px`;
+                tray.style.width = '300px';
+
+                // Limpa estilos
+                setTimeout(() => {
+                    if (!tray.classList.contains('collapsed')) {
+                        tray.style.height = 'auto';
+                        tray.style.width = '';
+                        tray.style.overflow = '';
+                        if(trayBody) trayBody.style.overflow = '';
+                    }
+                }, 300);
+
+            } else {
+                // --- FECHANDO ---
+                tray.style.height = `${tray.offsetHeight}px`;
+                tray.style.width = `${tray.offsetWidth}px`;
+                tray.style.overflow = 'hidden';
+                if(trayBody) trayBody.style.overflow = 'hidden';
+                
+                tray.offsetHeight; // Força reflow
+
+                tray.classList.add('collapsed');
+                tray.style.transition = 'all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1)';
+                
+                if (tray.classList.contains('dock-side')) {
+                    tray.style.height = '50px';
+                    tray.style.width = '50px';
+                } else {
+                    tray.style.height = '45px';
+                    tray.style.width = '300px';
                 }
-                else if (dir === 'n') {
-                    const newH = startH + (startY - e.clientY);
-                    if (newH > 150 && newH < window.innerHeight - 50) tray.style.height = newH + 'px';
+
+                // Limpa estilos
+                setTimeout(() => {
+                    if (tray.classList.contains('collapsed')) {
+                        tray.style.height = '';
+                        tray.style.width = '';
+                        tray.style.overflow = '';
+                        if(trayBody) trayBody.style.overflow = '';
+                    }
+                }, 300);
+            }
+            
+            // Atualiza ícone
+            const isCollapsed = tray.classList.contains('collapsed');
+            const isBottom = tray.classList.contains('dock-bottom');
+
+            if (!isBottom) {
+                icon.className = isCollapsed ? "fas fa-dice-d20" : "fas fa-times";
+            } else {
+                if (isCollapsed) {
+                    const rect = tray.getBoundingClientRect();
+                    if (rect.top < window.innerHeight / 2) icon.className = "fas fa-chevron-down";
+                    else icon.className = "fas fa-chevron-up";
+                } else {
+                    icon.className = "fas fa-chevron-up"; 
                 }
             }
-            function stopDrag() { document.removeEventListener('mousemove', doDrag); document.removeEventListener('mouseup', stopDrag); }
-            document.addEventListener('mousemove', doDrag); document.addEventListener('mouseup', stopDrag);
+        }
+    });
+
+    // =========================================================
+    // LÓGICA DE ROLAGEM
+    // =========================================================
+    const diceContainer = document.getElementById('diceContainer');
+    const btnToggleSign = document.getElementById('btnToggleSign');
+    const txtTotal = document.getElementById('txtTotal');
+    const txtDetalhes = document.getElementById('txtDetalhes');
+    const inputMod = document.getElementById('inputModificador');
+
+    function atualizarPreview() {
+        if(dadosSelecionados.length === 0 && Number(inputMod.value) === 0) {
+            txtDetalhes.innerText = "Selecione dados...";
+            txtTotal.innerText = "--";
+            return;
+        }
+        let formula = "";
+        dadosSelecionados.forEach((d, index) => {
+            const nomeDado = `1d${d.faces}`;
+            let operador = "";
+            if (index === 0) {
+                if (d.sinal === -1) operador = "- ";
+            } else {
+                operador = d.sinal === 1 ? " + " : " - ";
+            }
+            formula += `${operador}${nomeDado}`;
+        });
+        const mod = Number(inputMod.value);
+        if(mod !== 0) {
+            if(dadosSelecionados.length > 0) formula += mod > 0 ? ` + ${mod}` : ` - ${Math.abs(mod)}`;
+            else formula += `${mod}`;
+        }
+        txtDetalhes.innerText = formula;
+        txtTotal.innerText = "??";
+    }
+
+    btnToggleSign.addEventListener('click', () => {
+        modoNegativo = !modoNegativo;
+        if(modoNegativo) {
+            diceContainer.classList.add('negative-mode');
+            btnToggleSign.innerText = "-";
+        } else {
+            diceContainer.classList.remove('negative-mode');
+            btnToggleSign.innerText = "+";
+        }
+    });
+
+    document.querySelectorAll('.dice-btn[data-faces]').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const faces = Number(btn.getAttribute('data-faces'));
+            const sinal = modoNegativo ? -1 : 1;
+            dadosSelecionados.push({ faces, sinal });
+            if(modoNegativo) {
+                modoNegativo = false;
+                diceContainer.classList.remove('negative-mode');
+                btnToggleSign.innerText = "+";
+            }
+            atualizarPreview();
+        });
+    });
+
+    inputMod.addEventListener('input', atualizarPreview);
+
+    document.getElementById('btnLimparTray').addEventListener('click', () => {
+        dadosSelecionados = [];
+        inputMod.value = 0;
+        txtTotal.innerText = "--";
+        txtDetalhes.innerText = "Bandeja limpa";
+        modoNegativo = false;
+        diceContainer.classList.remove('negative-mode');
+        btnToggleSign.innerText = "+";
+    });
+
+    document.getElementById('btnRolarTray').addEventListener('click', () => {
+        if(dadosSelecionados.length === 0 && Number(inputMod.value) === 0) return;
+
+        let total = 0;
+        let partesTexto = [];
+
+        dadosSelecionados.forEach(d => {
+            const resultado = Math.floor(Math.random() * d.faces) + 1;
+            total += (resultado * d.sinal);
+            let resFormatado = resultado;
+            if (resultado === 1) resFormatado = `<span class="crit-fail">${resultado}</span>`;
+            else if (resultado === d.faces) resFormatado = `<span class="crit-success">${resultado}</span>`;
+            partesTexto.push({ texto: `(${resFormatado}) 1d${d.faces}`, sinal: d.sinal });
+        });
+
+        const mod = Number(inputMod.value);
+        total += mod;
+
+        let stringFinal = "";
+        partesTexto.forEach((parte, index) => {
+            let operador = "";
+            if (index === 0) {
+                if (parte.sinal === -1) operador = "- ";
+            } else {
+                operador = parte.sinal === 1 ? " + " : " - ";
+            }
+            stringFinal += `${operador}${parte.texto}`;
+        });
+
+        if (mod !== 0) stringFinal += ` ${mod >= 0 ? '+' : '-'} ${Math.abs(mod)}`;
+
+        txtTotal.innerText = total;
+        txtDetalhes.innerHTML = `[${total}] = ${stringFinal}`;
+
+        const textoLimpo = `[${total}] = ${stringFinal.replace(/<[^>]*>?/gm, '')}`;
+        if(user) update(ref(db, 'users/' + user.uid), { ultimaRolagem: textoLimpo });
+        
+        dadosSelecionados = [];
+    });
+}
+
+// =========================================================
+// 🎒 SISTEMA DE INVENTÁRIO
+// =========================================================
+
+function setupInventoryUI(uid) {
+    // ABAS
+    const tabs = document.querySelectorAll('.tab');
+    const views = {
+        0: 'view-combate',
+        2: 'view-inventario'
+    };
+
+    tabs.forEach((tab, index) => {
+        tab.addEventListener('click', () => {
+            tabs.forEach(t => t.classList.remove('active'));
+            tab.classList.add('active');
+
+            Object.values(views).forEach(id => {
+                const el = document.getElementById(id);
+                if(el) el.style.display = 'none';
+            });
+
+            const viewId = views[index];
+            if(viewId) {
+                const el = document.getElementById(viewId);
+                if(el) el.style.display = 'block';
+            }
+        });
+    });
+
+    // MODAL ITEM
+    const btnNovoItem = document.getElementById('btnNovoItem');
+    const modalItem = document.getElementById('modalItem');
+    const btnFecharItem = document.getElementById('btnFecharModalItem');
+    const btnSalvarItem = document.getElementById('btnSalvarItem');
+    const selectType = document.getElementById('newItemType');
+    const weaponFields = document.getElementById('weaponFields');
+    const modalTitle = modalItem.querySelector('h2');
+
+    // Controle de edição
+    let editingItemId = null;
+
+    if(selectType) {
+        selectType.addEventListener('change', () => {
+            if(selectType.value === 'arma') {
+                weaponFields.style.display = 'grid';
+            } else {
+                weaponFields.style.display = 'none';
+            }
         });
     }
 
-    // --- FIREBASE ---
-    onValue(chatRef, (snapshot) => {
-        const msgs = snapshot.val();
-        if (!msgs) return;
-        chatLog.innerHTML = "";
-        Object.values(msgs).sort((a,b)=>a.horario-b.horario).forEach(msg => {
-            const time = new Date(msg.horario).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
-            const div = document.createElement('div');
-            div.className = 'msg-line';
-            div.innerHTML = msg.tipo==='rolagem' 
-                ? `<span class="msg-timestamp">[${time}]</span> <span class="msg-author">${msg.nome}</span> rolou: <div class="msg-roll-box">${msg.conteudo.detalhes} = <b>${msg.conteudo.total}</b></div>`
-                : `<span class="msg-timestamp">[${time}]</span> <span class="msg-author">${msg.nome}</span>: <span class="msg-content">${msg.conteudo}</span>`;
-            chatLog.appendChild(div);
-        });
-        chatLog.scrollTop = chatLog.scrollHeight;
-    });
-
-    const enviar = () => {
-        const t = inputChat.value.trim();
-        if(!t) return;
-        const n = document.getElementById('displayNome').innerText || "Eu";
-        push(chatRef, { tipo:'texto', nome:n, uid:user.uid, horario:Date.now(), conteudo:t });
-        inputChat.value="";
+    // Abrir Modal
+    window.abrirModalItem = (item = null, id = null) => {
+        modalItem.style.display = 'flex';
+        if(item) {
+            // Edição
+            editingItemId = id;
+            modalTitle.innerText = "Editar Item";
+            document.getElementById('newItemName').value = item.nome;
+            document.getElementById('newItemWeight').value = item.peso;
+            document.getElementById('newItemType').value = item.tipo;
+            document.getElementById('newItemTags').value = item.tags || "";
+            document.getElementById('newItemDesc').value = item.descricao || "";
+            
+            if(item.tipo === 'arma') {
+                weaponFields.style.display = 'grid';
+                document.getElementById('newItemDamage').value = item.dano || "";
+                document.getElementById('newItemMod').value = item.modificador || "";
+            } else {
+                weaponFields.style.display = 'none';
+            }
+        } else {
+            // Novo
+            editingItemId = null;
+            modalTitle.innerText = "Novo Item";
+            document.getElementById('newItemName').value = "";
+            document.getElementById('newItemTags').value = "";
+            document.getElementById('newItemDesc').value = "";
+            document.getElementById('newItemWeight').value = "1.0";
+            document.getElementById('newItemDamage').value = "";
+            document.getElementById('newItemMod').value = "";
+            weaponFields.style.display = 'none';
+            selectType.value = 'comum';
+        }
     };
-    if(btnEnviar) btnEnviar.addEventListener('click', enviar);
-    if(inputChat) inputChat.addEventListener('keypress', (e) => { if(e.key==='Enter') enviar(); });
+
+    if(btnNovoItem) btnNovoItem.onclick = () => { window.abrirModalItem(); };
+    if(btnFecharItem) btnFecharItem.onclick = () => { modalItem.style.display = 'none'; };
+
+    if(btnSalvarItem) {
+        // Evita duplicação de listeners
+        const novoBtn = btnSalvarItem.cloneNode(true);
+        btnSalvarItem.parentNode.replaceChild(novoBtn, btnSalvarItem);
+        
+        novoBtn.onclick = () => {
+            const nome = document.getElementById('newItemName').value;
+            const peso = document.getElementById('newItemWeight').value;
+            const tipo = document.getElementById('newItemType').value;
+            const tags = document.getElementById('newItemTags').value;
+            const desc = document.getElementById('newItemDesc').value;
+            const dano = document.getElementById('newItemDamage').value;
+            const mod = document.getElementById('newItemMod').value;
+            
+            if(nome) {
+                const itemData = {
+                    nome, 
+                    peso: Number(peso), 
+                    tipo, 
+                    tags, 
+                    descricao: desc, 
+                    dano: tipo === 'arma' ? dano : '',
+                    modificador: tipo === 'arma' ? Number(mod) : 0,
+                    // Mantém estado equipado
+                    equipado: editingItemId ? undefined : false 
+                };
+
+                // Remove undefined keys
+                Object.keys(itemData).forEach(key => itemData[key] === undefined && delete itemData[key]);
+
+                if(editingItemId) {
+                    update(ref(db, 'users/' + uid + '/inventario/' + editingItemId), itemData);
+                } else {
+                    push(ref(db, 'users/' + uid + '/inventario'), itemData);
+                }
+
+                modalItem.style.display = 'none';
+            } else {
+                alert("Nome é obrigatório!");
+            }
+        };
+    }
 }
-// =========================================================
-// Fim chat
-// =========================================================
+
+function carregarInventario(uid) {
+    const invRef = ref(db, 'users/' + uid + '/inventario');
+    const cargaRef = ref(db, 'users/' + uid + '/cargaMaxima');
+
+    // Carrega Carga Máxima
+    onValue(cargaRef, (snapshot) => {
+        const max = snapshot.val() || 20;
+        const elMax = document.getElementById('maxPeso');
+        if(elMax) elMax.innerText = max;
+    });
+    
+    onValue(invRef, (snapshot) => {
+        const itens = snapshot.val();
+        const lista = document.getElementById('lista-inventario');
+        const slotArma = document.getElementById('slot-arma').querySelector('.slot-content');
+        const slotArmadura = document.getElementById('slot-armadura').querySelector('.slot-content');
+        
+        if(!lista) return;
+
+        lista.innerHTML = "";
+        slotArma.innerHTML = "";
+        slotArmadura.innerHTML = "";
+        
+        let pesoTotal = 0;
+
+        if(itens) {
+            Object.entries(itens).forEach(([id, item]) => {
+                pesoTotal += Number(item.peso) || 0;
+                
+                const itemHTML = `
+                    <div class="action-card type-comum collapsed expandable-card" data-id="${id}" style="border-left: 4px solid ${item.equipado ? 'var(--primary)' : '#ccc'}; position: relative;">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <div class="card-title" style="margin-bottom: 0;">${item.nome} ${item.equipado ? '<i class="fas fa-check-circle" style="color: var(--primary); margin-left: 5px;"></i>' : ''}</div>
+                            <div style="font-size: 0.8rem; color: var(--text-sec); font-weight: bold;">${item.peso} PC</div>
+                        </div>
+                        ${item.tipo === 'arma' && item.dano ? `<div style="font-size: 0.85rem; color: var(--color-power); font-weight: bold; margin-top: 2px;">⚔️ ${item.dano} ${item.modificador ? (item.modificador > 0 ? `+${item.modificador}` : item.modificador) : ''}</div>` : ''}
+                        <div class="card-desc" style="margin-top: 5px;">${item.descricao}</div>
+                        <div class="card-tags" style="margin-top: 5px;">
+                            ${item.tags ? item.tags.split(',').map(t => `<span class="tag tag-damage">${t.trim()}</span>`).join('') : ''}
+                        </div>
+                        <div class="card-actions" style="margin-top: 10px; display: flex; gap: 5px; justify-content: flex-end; align-items: center;">
+                            ${(item.tipo === 'arma' || item.tipo === 'armadura') ? 
+                                `<button class="btn-equip" data-id="${id}" data-tipo="${item.tipo}" data-equipado="${item.equipado}" style="background: var(--bg-button); color: var(--text-button); border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 0.8rem;">${item.equipado ? 'Desequipar' : 'Equipar'}</button>` 
+                                : ''}
+                            <i class="fas fa-edit btn-edit-item" data-id="${id}" style="color: var(--text-sec); cursor: pointer; margin-left: 5px;"></i>
+                            <i class="fas fa-trash btn-delete-item" data-id="${id}" style="color: #ff6b6b; cursor: pointer; margin-left: 10px;"></i>
+                        </div>
+                    </div>
+                `;
+
+                if(item.equipado) {
+                    // Renderiza no Slot
+                    const slotHTML = `
+                        <div style="width: 100%; padding: 10px;">
+                            <div style="font-weight: bold; color: var(--primary); font-size: 1.1rem;">${item.nome}</div>
+                            ${item.tipo === 'arma' && item.dano ? `<div style="font-size: 0.9rem; color: var(--color-power); font-weight: bold; margin: 5px 0;">⚔️ ${item.dano} ${item.modificador ? (item.modificador > 0 ? `+${item.modificador}` : item.modificador) : ''}</div>` : ''}
+                            <div style="font-size: 0.8rem; color: var(--text-sec); margin-bottom: 5px;">${item.tags || ''}</div>
+                            <div style="font-size: 0.8rem; font-weight: bold; color: var(--text-main);">${item.peso} PC</div>
+                            <button class="btn-equip" data-id="${id}" data-tipo="${item.tipo}" data-equipado="true" style="margin-top: 8px; font-size: 0.8rem; padding: 4px 12px; background: var(--bg-button); color: var(--text-button); border: none; border-radius: 4px; cursor: pointer;">Desequipar</button>
+                        </div>
+                    `;
+                    if(item.tipo === 'arma') slotArma.innerHTML = slotHTML;
+                    if(item.tipo === 'armadura') slotArmadura.innerHTML = slotHTML;
+                } else {
+                    // Renderiza na Mochila
+                    lista.innerHTML += itemHTML;
+                }
+            });
+        }
+        
+        atualizarPeso(pesoTotal);
+        
+        // Listeners
+        document.querySelectorAll('.btn-delete-item').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if(confirm("Apagar este item?")) {
+                    remove(ref(db, 'users/' + uid + '/inventario/' + e.target.getAttribute('data-id')));
+                }
+            });
+        });
+
+        document.querySelectorAll('.btn-edit-item').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const id = e.target.getAttribute('data-id');
+                const item = itens[id];
+                window.abrirModalItem(item, id);
+            });
+        });
+
+        document.querySelectorAll('.btn-equip').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const id = e.target.getAttribute('data-id');
+                const tipo = e.target.getAttribute('data-tipo');
+                const estaEquipado = e.target.getAttribute('data-equipado') === 'true';
+                
+                // Desequipa outros do mesmo tipo
+                if(!estaEquipado) {
+                    Object.entries(itens || {}).forEach(([k, v]) => {
+                        if(v.tipo === tipo && v.equipado) {
+                            update(ref(db, 'users/' + uid + '/inventario/' + k), { equipado: false });
+                        }
+                    });
+                }
+
+                update(ref(db, 'users/' + uid + '/inventario/' + id), { equipado: !estaEquipado });
+            });
+        });
+
+        // Expandir/Recolher
+        document.querySelectorAll('.expandable-card').forEach(card => {
+            card.addEventListener('click', () => {
+                card.classList.toggle('collapsed');
+                card.classList.toggle('expanded');
+            });
+        });
+    });
+}
+
+function atualizarPeso(pesoTotal) {
+    const elValPeso = document.getElementById('valPeso');
+    const elMaxPeso = document.getElementById('maxPeso');
+    const elFillPeso = document.getElementById('fillPeso');
+    const msgSobrecarga = document.getElementById('msgSobrecarga');
+    
+    const maxPeso = Number(elMaxPeso.innerText) || 20;
+    elValPeso.innerText = pesoTotal.toFixed(1);
+    
+    const pct = (pesoTotal / maxPeso) * 100;
+    elFillPeso.style.width = `${Math.min(100, pct)}%`;
+    
+    // Cores Progressivas
+    if (pct >= 100) {
+        elFillPeso.style.background = '#ff4444';
+        msgSobrecarga.style.display = 'block';
+        msgSobrecarga.innerHTML = '<i class="fas fa-exclamation-triangle"></i> LIMITE ATINGIDO!';
+    } else if (pct > 50) {
+        // Sobrecarga
+        if (pct >= 90) elFillPeso.style.background = '#ff4444';
+        else if (pct >= 75) elFillPeso.style.background = 'orangered';
+        else elFillPeso.style.background = 'var(--color-power)';
+        
+        msgSobrecarga.style.display = 'block';
+        // TODO: Implementar penalidades mecânicas de sobrecarga futuramente
+        msgSobrecarga.innerHTML = '<i class="fas fa-weight-hanging"></i> SOBRECARGA';
+    } else if (pct >= 25) {
+        elFillPeso.style.background = 'var(--color-bonus)'; // Amarelo
+        msgSobrecarga.style.display = 'none';
+    } else {
+        elFillPeso.style.background = 'var(--color-react)'; // Verde
+        msgSobrecarga.style.display = 'none';
+    }
+}
