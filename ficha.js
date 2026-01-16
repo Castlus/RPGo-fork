@@ -27,6 +27,7 @@ onAuthStateChanged(auth, (user) => {
         // Inicializa a lógica da bandeja passando o user para salvar rolagem
         configurarEdicao('valNivel', 'nivel', 'null', user.uid);
         iniciarBandejaDados(user);
+        iniciarChat(user);
         configurarTema(); // <--- INICIA O TEMA
     } else {
         window.location.href = "index.html";
@@ -268,461 +269,227 @@ function configurarEdicao(elementoId, campoBanco, elementoMaxId, uid) {
 // =========================================================
 // 🎲 LÓGICA DA BANDEJA (SMART DOCKING)
 // =========================================================
-function iniciarBandejaDados(user) {
-    let dadosSelecionados = [];
-    let modoNegativo = false;
-    
-    // ELEMENTOS
-    const tray = document.getElementById('diceTray');
-    const header = document.getElementById('diceTrayHeader');
-    const icon = document.getElementById('trayIcon'); // Ícone da setinha
-    
-    // VARIÁVEIS DE ARRASTO
+function iniciarChat(user) {
+    const tray = document.getElementById('chatTray');
+    const header = document.getElementById('chatHeader');
+    const icon = document.getElementById('chatIcon');
+    const chatLog = document.getElementById('chatLog');
+    const inputChat = document.getElementById('chatInput');
+    const btnEnviar = document.getElementById('btnEnviarChat');
+    const chatRef = ref(db, 'chat_global');
+
+    // Resizers
+    const resizeW = document.getElementById('resizeW');
+    const resizeE = document.getElementById('resizeE');
+    const resizeN = document.getElementById('resizeN');
+
+    // ESTADO INICIAL: Bola na Direita
+    tray.className = "chat-tray collapsed dock-side"; 
+    tray.style.top = "200px"; 
+    tray.style.right = "0px";
+    tray.style.left = "auto";
+    icon.className = "fas fa-comment-dots";
+
+    // --- ARRASTO ---
     let isDragging = false;
-    let startX, startY, initialLeft, initialTop;
     let hasMoved = false;
-    let dragStartTime = 0;
+    let dragOffsetX = 0, dragOffsetY = 0;
 
-    // Estado Inicial: Grudado em baixo
-    tray.classList.add('dock-bottom', 'collapsed');
-
-    // --- LÓGICA DE ARRASTAR (MOUSEDOWN) ---
     header.addEventListener('mousedown', (e) => {
+        // Se estiver aberto e dockado, não arrasta pelo header
+        const isCollapsed = tray.classList.contains('collapsed');
+        const isDocked = tray.classList.contains('dock-side') || tray.classList.contains('dock-bottom');
+        if (!isCollapsed && isDocked) return;
+
         isDragging = true;
         hasMoved = false;
-        dragStartTime = Date.now(); // Marca o tempo de início
-        startX = e.clientX;
-        startY = e.clientY;
         
-        // Captura posição inicial mas NÃO altera estilos ainda
-        // Isso evita que um clique simples quebre a ancoragem (right: 0)
         const rect = tray.getBoundingClientRect();
-        initialLeft = rect.left;
-        initialTop = rect.top;
+        dragOffsetX = e.clientX - rect.left;
+        dragOffsetY = e.clientY - rect.top;
         
         header.style.cursor = 'grabbing';
+        // NÃO removemos a transição aqui para permitir o morph Bola->Barra
+        // tray.style.transition = 'none'; 
     });
 
-    // --- MOVIMENTO (MOUSEMOVE) ---
     document.addEventListener('mousemove', (e) => {
         if (!isDragging) return;
 
-        const dx = e.clientX - startX;
-        const dy = e.clientY - startY;
+        if (!hasMoved) {
+            // Sensibilidade do arrasto
+            if (Math.abs(e.clientX - (tray.getBoundingClientRect().left + dragOffsetX)) > 5 || 
+                Math.abs(e.clientY - (tray.getBoundingClientRect().top + dragOffsetY)) > 5) {
+                 
+                 hasMoved = true;
 
-        // Só considera movimento se passar de 5px
-        if (!hasMoved && (Math.abs(dx) > 5 || Math.abs(dy) > 5)) {
-            hasMoved = true;
-            
-            // Verifica estado atual
-            const isCollapsed = tray.classList.contains('collapsed');
-            
-            // Remove classes de dock
-            tray.classList.remove('dock-bottom', 'dock-side');
-            
-            if (isCollapsed) {
-                // SE ERA BOLINHA: Mantém bolinha e centraliza no mouse
-                tray.style.transition = 'width 0.3s ease, height 0.3s ease, border-radius 0.3s ease';
-                icon.className = "fas fa-dice-d20"; 
+                 // === MÁGICA DA ANIMAÇÃO ===
+                 // Remove o dock-side/bottom. O CSS vai animar de Bola -> Barra automaticamente
+                 tray.classList.remove('dock-bottom', 'dock-side');
+                 
+                 // Garante que está fechado (Barra)
+                 tray.classList.add('collapsed');
+                 
+                 // Limpa tamanhos para o CSS da Barra pegar
+                 tray.style.width = ''; 
+                 tray.style.height = '';
 
-                // Centraliza no mouse (25, 25)
-                initialLeft = startX - 25;
-                initialTop = startY - 25;
-            } else {
-                // SE ESTAVA ABERTO: Mantém aberto e segue o mouse com o offset original
-                tray.style.transition = 'none'; 
-                // Não centraliza, usa o ponto onde clicou no header
+                 // Ajusta offset (O mouse estava na bola, agora está na barra)
+                 // Para não pular, centralizamos o mouse na barra
+                 icon.className = "fas fa-comment-dots";
             }
-
-            // Aplica posição inicial corrigida
-            tray.style.left = `${initialLeft}px`;
-            tray.style.top = `${initialTop}px`;
-            tray.style.bottom = 'auto';
-            tray.style.right = 'auto';
         }
 
         if (hasMoved) {
-            // Calcula nova posição
-            let newLeft = initialLeft + dx;
-            let newTop = initialTop + dy;
+            let newLeft = e.clientX - dragOffsetX;
+            let newTop = e.clientY - dragOffsetY;
 
-            // REGRA 1: NÃO SAIR DA TELA
-            const windowWidth = window.innerWidth;
-            const windowHeight = window.innerHeight;
-            
-            // Usa o tamanho atual da bandeja (seja bolinha ou aberta)
-            const currentWidth = tray.offsetWidth;
-            const currentHeight = tray.offsetHeight;
+            // Limites da tela
+            const w = window.innerWidth;
+            const h = window.innerHeight;
+            // Pega tamanho atual (que está animando para barra)
+            const cw = 300; // Largura da barra
+            const ch = 45;  // Altura da barra
 
-            // Clampa (limita) os valores dentro da janela
-            newLeft = Math.max(0, Math.min(newLeft, windowWidth - currentWidth));
-            newTop = Math.max(0, Math.min(newTop, windowHeight - currentHeight));
+            newLeft = Math.max(0, Math.min(newLeft, w - cw));
+            newTop = Math.max(0, Math.min(newTop, h - ch));
 
-            // Aplica posição
             tray.style.left = `${newLeft}px`;
             tray.style.top = `${newTop}px`;
-            
-            // Remove ancoragens antigas
+            tray.style.right = 'auto'; 
             tray.style.bottom = 'auto';
-            tray.style.right = 'auto';
         }
     });
 
-    // --- SOLTAR (MOUSEUP) - AQUI ACONTECE A MÁGICA DO GRUDE ---
     document.addEventListener('mouseup', () => {
-        if (!isDragging) return;
-        isDragging = false;
-        header.style.cursor = 'grab';
-        
-        // Restaura a transição suave para o efeito de "snap"
-        tray.style.transition = 'all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1)';
-
-        if (hasMoved) {
-            snapToNearestEdge();
+        if (isDragging) {
+            isDragging = false;
+            header.style.cursor = 'grab';
+            if (hasMoved) snapToNearestEdge();
+            else toggleChat();
         }
     });
 
-    // --- FUNÇÃO: GRUDAR NA BORDA MAIS PRÓXIMA ---
+    // --- SNAP (Imã) ---
     function snapToNearestEdge() {
         const rect = tray.getBoundingClientRect();
-        const windowWidth = window.innerWidth;
-        const windowHeight = window.innerHeight;
-
-        // Distâncias para as bordas
+        const w = window.innerWidth;
+        const h = window.innerHeight;
+        
+        const distRight = w - rect.right;
         const distLeft = rect.left;
-        const distRight = windowWidth - (rect.left + rect.width);
-        const distBottom = windowHeight - (rect.top + rect.height);
-        
-        const snapThreshold = 80; 
-        const safeMargin = 20;
-        const estimatedHeight = 400; // Altura estimada da bandeja aberta
+        const distBottom = h - rect.bottom;
+        const snapLimit = 100;
 
-        // Limpa classes antigas
         tray.classList.remove('dock-bottom', 'dock-side');
-        
-        // IMPORTANTE: Remove 'collapsed' para abrir ao soltar
-        // tray.classList.remove('collapsed'); // REMOVIDO: Agora controlamos isso por caso
+        tray.style.width = ''; tray.style.height = '';
 
-        if (distBottom < snapThreshold) {
-            // GRUDA EM BAIXO (Modo Barra)
-            tray.classList.add('dock-bottom');
-            tray.classList.add('collapsed'); // FECHA AO GRUDAR EM BAIXO
-            
-            // ANIMAÇÃO DE DESCIDA
-            const collapsedHeight = 45; 
-            const targetTop = windowHeight - collapsedHeight;
-            
-            // Define posição inicial da animação (onde ele vai cair)
-            tray.style.bottom = 'auto'; 
-            tray.style.top = `${targetTop}px`;
-            tray.style.left = `${Math.max(0, Math.min(rect.left, windowWidth - 300))}px`;
-            tray.style.right = 'auto';
-            
-            icon.className = "fas fa-chevron-up"; 
+        if (distRight < snapLimit) { // Direita -> Bola
+            tray.classList.add('dock-side', 'collapsed');
+            tray.style.left = 'auto'; tray.style.right = '0';
+            tray.style.top = `${Math.max(0, Math.min(rect.top, h - 50))}px`;
+            icon.className = "fas fa-comment-dots";
+        } 
+        else if (distLeft < snapLimit) { // Esquerda -> Bola
+            tray.classList.add('dock-side', 'collapsed');
+            tray.style.right = 'auto'; tray.style.left = '0';
+            tray.style.top = `${Math.max(0, Math.min(rect.top, h - 50))}px`;
+            icon.className = "fas fa-comment-dots";
+        }
+        else if (distBottom < snapLimit) { // Baixo -> Barra
+            tray.classList.add('dock-bottom', 'collapsed');
+            tray.style.top = 'auto'; tray.style.bottom = '0';
+            let targetLeft = Math.max(0, Math.min(rect.left, w - 300));
+            tray.style.left = `${targetLeft}px`;
+            icon.className = "fas fa-chevron-up";
+        }
+    }
 
-            // Depois da animação, fixa no bottom para responsividade
-            setTimeout(() => {
-                if (tray.classList.contains('dock-bottom') && !isDragging) {
-                    tray.style.top = 'auto';
-                    tray.style.bottom = '0';
-                }
-            }, 300);
-
-        } else if (distLeft < snapThreshold) {
-            // GRUDA NA ESQUERDA
-            tray.classList.add('dock-side');
-            tray.classList.add('collapsed'); // VIRA BOLINHA NA ESQUERDA
+    // --- CLIQUE ---
+    function toggleChat() {
+        const isCollapsed = tray.classList.contains('collapsed');
+        if (isCollapsed) { // Abrir
+            tray.classList.remove('collapsed');
+            if (!tray.style.width) tray.style.width = "350px"; // Default
+            if (!tray.style.height) tray.style.height = "450px";
             
-            tray.style.right = 'auto';
-            tray.style.left = '0'; 
-            tray.style.bottom = 'auto';
+            // Ícones
+            if (tray.classList.contains('dock-bottom')) icon.className = "fas fa-chevron-down";
+            else icon.className = "fas fa-minus";
             
-            // Ajusta Top para ficar visível
-            let targetTop = Math.max(safeMargin, Math.min(rect.top, windowHeight - 100));
-            tray.style.top = `${targetTop}px`;
-
-            icon.className = "fas fa-dice-d20";
-
-        } else if (distRight < snapThreshold) {
-            // GRUDA NA DIREITA
-            tray.classList.add('dock-side');
-            tray.classList.add('collapsed'); // VIRA BOLINHA NA DIREITA
+            chatLog.scrollTop = chatLog.scrollHeight;
+        } else { // Fechar
+            tray.classList.add('collapsed');
+            tray.style.width = ''; tray.style.height = ''; // Limpa para CSS assumir
             
-            tray.style.left = 'auto';
-            tray.style.right = '0'; 
-            tray.style.bottom = 'auto';
-            
-            let targetTop = Math.max(safeMargin, Math.min(rect.top, windowHeight - 100));
-            tray.style.top = `${targetTop}px`;
-
-            icon.className = "fas fa-dice-d20";
-
-        } else {
-            // FLUTUANDO (Sem dock)
-            // Mantém o estado anterior (se estava fechado, continua. Se aberto, continua).
-            
-            // 1. Ajusta Horizontal (Left)
-            let finalLeft = rect.left;
-            if (finalLeft + 300 > windowWidth) {
-                finalLeft = windowWidth - 300 - safeMargin;
-            }
-            tray.style.left = `${Math.max(safeMargin, finalLeft)}px`;
-            tray.style.right = 'auto';
-
-            // 2. Ajusta Vertical (Top/Bottom)
-            // Se estiver muito em baixo, expande pra CIMA
-            if (rect.top + estimatedHeight > windowHeight) {
-                // Expande pra cima: Fixa Bottom
-                const bottomPos = windowHeight - rect.bottom;
-                tray.style.bottom = `${Math.max(safeMargin, bottomPos)}px`;
-                tray.style.top = 'auto';
-            } else {
-                // Expande pra baixo: Fixa Top
-                tray.style.top = `${rect.top}px`;
-                tray.style.bottom = 'auto';
-            }
-            
-            // Ajusta ícone conforme estado
-            if (tray.classList.contains('collapsed')) {
-                icon.className = "fas fa-dice-d20";
-            } else {
-                icon.className = "fas fa-times";
+            if (tray.classList.contains('dock-side')) icon.className = "fas fa-comment-dots";
+            else if (tray.classList.contains('dock-bottom')) icon.className = "fas fa-chevron-up";
+            else { 
+                // Se flutuando, vira Barra por padrão (comportamento rolador)
+                icon.className = "fas fa-comment-dots"; 
             }
         }
     }
 
-    // --- CLIQUE NO HEADER (ABRIR/FECHAR) ---
-    header.addEventListener('click', () => {
-        // Só abre/fecha se NÃO moveu E se foi um clique rápido (< 200ms)
-        const clickDuration = Date.now() - dragStartTime;
-        
-        if (!hasMoved && clickDuration < 200) {
-            const willOpen = tray.classList.contains('collapsed');
-            const isFloating = !tray.classList.contains('dock-bottom') && !tray.classList.contains('dock-side');
-            const trayBody = tray.querySelector('.tray-body');
-
-            if (willOpen) {
-                // --- ABRINDO (Animação FLIP) ---
-                const rect = tray.getBoundingClientRect();
-                const startHeight = tray.offsetHeight;
-                const startWidth = tray.offsetWidth;
-                
-                // Prepara para medir o tamanho final (sem animação)
-                tray.style.transition = 'none';
-                tray.classList.remove('collapsed');
-                tray.style.height = 'auto';
-                tray.style.width = '300px';
-                tray.style.overflow = 'hidden';
-                if(trayBody) trayBody.style.overflow = 'hidden';
-                
-                const targetHeight = tray.scrollHeight;
-                
-                // LÓGICA DE POSICIONAMENTO (Smart Expansion)
-                const windowHeight = window.innerHeight;
-                const windowWidth = window.innerWidth;
-                
-                const spaceBelow = windowHeight - rect.top;
-                const spaceAbove = rect.bottom; 
-                
-                // Se tiver pouco espaço em baixo (< 350px) e mais espaço em cima, expande pra CIMA
-                if (spaceBelow < 350 && spaceAbove > spaceBelow) {
-                    const bottomPos = windowHeight - rect.bottom;
-                    tray.style.bottom = `${bottomPos}px`;
-                    tray.style.top = 'auto';
-                } else {
-                    tray.style.top = `${rect.top}px`;
-                    tray.style.bottom = 'auto';
-                }
-
-                // CORREÇÃO HORIZONTAL
-                if (isFloating) {
-                    const expandedWidth = 300;
-                    if (rect.left + expandedWidth > windowWidth) {
-                        const newLeft = windowWidth - expandedWidth - 10;
-                        tray.style.left = `${Math.max(0, newLeft)}px`;
+    // --- RESIZE (Mantido) ---
+    setupResize(resizeW, 'w'); setupResize(resizeE, 'e'); setupResize(resizeN, 'n'); 
+    function setupResize(handle, dir) {
+        if(!handle) return;
+        handle.addEventListener('mousedown', (e) => {
+            e.preventDefault(); e.stopPropagation();
+            const startX = e.clientX; const startY = e.clientY;
+            const startW = parseInt(document.defaultView.getComputedStyle(tray).width, 10);
+            const startH = parseInt(document.defaultView.getComputedStyle(tray).height, 10);
+            const startLeft = tray.getBoundingClientRect().left;
+            function doDrag(e) {
+                if (dir === 'w') { 
+                    const newW = startW + (startX - e.clientX);
+                    if (newW > 300 && newW < window.innerWidth - 20) {
+                        tray.style.width = newW + 'px';
+                        if (tray.style.right !== "0px") tray.style.left = `${startLeft - (startX - e.clientX)}px`;
                     }
                 }
-
-                // Volta pro estado inicial para começar a animar
-                tray.style.height = `${startHeight}px`;
-                tray.style.width = `${startWidth}px`;
-                
-                tray.offsetHeight; // Força reflow
-                
-                // Ativa transição e vai pro final
-                tray.style.transition = 'all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1)';
-                tray.style.height = `${targetHeight}px`;
-                tray.style.width = '300px';
-
-                // Limpa estilo inline após animação
-                setTimeout(() => {
-                    if (!tray.classList.contains('collapsed')) {
-                        tray.style.height = 'auto';
-                        tray.style.width = '';
-                        tray.style.overflow = '';
-                        if(trayBody) trayBody.style.overflow = '';
-                    }
-                }, 300);
-
-            } else {
-                // --- FECHANDO ---
-                tray.style.height = `${tray.offsetHeight}px`;
-                tray.style.width = `${tray.offsetWidth}px`;
-                tray.style.overflow = 'hidden';
-                if(trayBody) trayBody.style.overflow = 'hidden';
-                
-                tray.offsetHeight; // Força reflow
-
-                tray.classList.add('collapsed');
-                tray.style.transition = 'all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1)';
-                
-                // Define tamanho final
-                if (tray.classList.contains('dock-side')) {
-                    tray.style.height = '50px';
-                    tray.style.width = '50px';
-                } else {
-                    tray.style.height = '45px';
-                    tray.style.width = '300px';
+                else if (dir === 'e') {
+                    const newW = startW + (e.clientX - startX);
+                    if (newW > 300 && newW < window.innerWidth - 20) tray.style.width = newW + 'px';
                 }
-
-                // Limpa estilo inline
-                setTimeout(() => {
-                    if (tray.classList.contains('collapsed')) {
-                        tray.style.height = '';
-                        tray.style.width = '';
-                        tray.style.overflow = '';
-                        if(trayBody) trayBody.style.overflow = '';
-                    }
-                }, 300);
-            }
-            
-            // Atualiza ícone
-            const isCollapsed = tray.classList.contains('collapsed');
-            const isBottom = tray.classList.contains('dock-bottom');
-
-            if (!isBottom) {
-                icon.className = isCollapsed ? "fas fa-dice-d20" : "fas fa-times";
-            } else {
-                if (isCollapsed) {
-                    const rect = tray.getBoundingClientRect();
-                    if (rect.top < window.innerHeight / 2) icon.className = "fas fa-chevron-down";
-                    else icon.className = "fas fa-chevron-up";
-                } else {
-                    icon.className = "fas fa-chevron-up"; 
+                else if (dir === 'n') {
+                    const newH = startH + (startY - e.clientY);
+                    if (newH > 150 && newH < window.innerHeight - 50) tray.style.height = newH + 'px';
                 }
             }
-        }
-    });
-
-    // =========================================================
-    // LÓGICA DE ROLAGEM (IGUAL À ANTERIOR)
-    // =========================================================
-    const diceContainer = document.getElementById('diceContainer');
-    const btnToggleSign = document.getElementById('btnToggleSign');
-    const txtTotal = document.getElementById('txtTotal');
-    const txtDetalhes = document.getElementById('txtDetalhes');
-    const inputMod = document.getElementById('inputModificador');
-
-    function atualizarPreview() {
-        if(dadosSelecionados.length === 0 && Number(inputMod.value) === 0) {
-            txtDetalhes.innerText = "Selecione dados...";
-            txtTotal.innerText = "--";
-            return;
-        }
-        let formula = "";
-        dadosSelecionados.forEach((d, index) => {
-            const nomeDado = `1d${d.faces}`;
-            let operador = "";
-            if (index === 0) {
-                if (d.sinal === -1) operador = "- ";
-            } else {
-                operador = d.sinal === 1 ? " + " : " - ";
-            }
-            formula += `${operador}${nomeDado}`;
+            function stopDrag() { document.removeEventListener('mousemove', doDrag); document.removeEventListener('mouseup', stopDrag); }
+            document.addEventListener('mousemove', doDrag); document.addEventListener('mouseup', stopDrag);
         });
-        const mod = Number(inputMod.value);
-        if(mod !== 0) {
-            if(dadosSelecionados.length > 0) formula += mod > 0 ? ` + ${mod}` : ` - ${Math.abs(mod)}`;
-            else formula += `${mod}`;
-        }
-        txtDetalhes.innerText = formula;
-        txtTotal.innerText = "??";
     }
 
-    btnToggleSign.addEventListener('click', () => {
-        modoNegativo = !modoNegativo;
-        if(modoNegativo) {
-            diceContainer.classList.add('negative-mode');
-            btnToggleSign.innerText = "-";
-        } else {
-            diceContainer.classList.remove('negative-mode');
-            btnToggleSign.innerText = "+";
-        }
-    });
-
-    document.querySelectorAll('.dice-btn[data-faces]').forEach(btn => {
-        btn.addEventListener('click', () => {
-            const faces = Number(btn.getAttribute('data-faces'));
-            const sinal = modoNegativo ? -1 : 1;
-            dadosSelecionados.push({ faces, sinal });
-            if(modoNegativo) {
-                modoNegativo = false;
-                diceContainer.classList.remove('negative-mode');
-                btnToggleSign.innerText = "+";
-            }
-            atualizarPreview();
+    // --- FIREBASE ---
+    onValue(chatRef, (snapshot) => {
+        const msgs = snapshot.val();
+        if (!msgs) return;
+        chatLog.innerHTML = "";
+        Object.values(msgs).sort((a,b)=>a.horario-b.horario).forEach(msg => {
+            const time = new Date(msg.horario).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+            const div = document.createElement('div');
+            div.className = 'msg-line';
+            div.innerHTML = msg.tipo==='rolagem' 
+                ? `<span class="msg-timestamp">[${time}]</span> <span class="msg-author">${msg.nome}</span> rolou: <div class="msg-roll-box">${msg.conteudo.detalhes} = <b>${msg.conteudo.total}</b></div>`
+                : `<span class="msg-timestamp">[${time}]</span> <span class="msg-author">${msg.nome}</span>: <span class="msg-content">${msg.conteudo}</span>`;
+            chatLog.appendChild(div);
         });
+        chatLog.scrollTop = chatLog.scrollHeight;
     });
 
-    inputMod.addEventListener('input', atualizarPreview);
-
-    document.getElementById('btnLimparTray').addEventListener('click', () => {
-        dadosSelecionados = [];
-        inputMod.value = 0;
-        txtTotal.innerText = "--";
-        txtDetalhes.innerText = "Bandeja limpa";
-        modoNegativo = false;
-        diceContainer.classList.remove('negative-mode');
-        btnToggleSign.innerText = "+";
-    });
-
-    document.getElementById('btnRolarTray').addEventListener('click', () => {
-        if(dadosSelecionados.length === 0 && Number(inputMod.value) === 0) return;
-
-        let total = 0;
-        let partesTexto = [];
-
-        dadosSelecionados.forEach(d => {
-            const resultado = Math.floor(Math.random() * d.faces) + 1;
-            total += (resultado * d.sinal);
-            let resFormatado = resultado;
-            if (resultado === 1) resFormatado = `<span class="crit-fail">${resultado}</span>`;
-            else if (resultado === d.faces) resFormatado = `<span class="crit-success">${resultado}</span>`;
-            partesTexto.push({ texto: `(${resFormatado}) 1d${d.faces}`, sinal: d.sinal });
-        });
-
-        const mod = Number(inputMod.value);
-        total += mod;
-
-        let stringFinal = "";
-        partesTexto.forEach((parte, index) => {
-            let operador = "";
-            if (index === 0) {
-                if (parte.sinal === -1) operador = "- ";
-            } else {
-                operador = parte.sinal === 1 ? " + " : " - ";
-            }
-            stringFinal += `${operador}${parte.texto}`;
-        });
-
-        if (mod !== 0) stringFinal += ` ${mod >= 0 ? '+' : '-'} ${Math.abs(mod)}`;
-
-        txtTotal.innerText = total;
-        txtDetalhes.innerHTML = `[${total}] = ${stringFinal}`;
-
-        const textoLimpo = `[${total}] = ${stringFinal.replace(/<[^>]*>?/gm, '')}`;
-        if(user) update(ref(db, 'users/' + user.uid), { ultimaRolagem: textoLimpo });
-        
-        dadosSelecionados = [];
-    });
+    const enviar = () => {
+        const t = inputChat.value.trim();
+        if(!t) return;
+        const n = document.getElementById('displayNome').innerText || "Eu";
+        push(chatRef, { tipo:'texto', nome:n, uid:user.uid, horario:Date.now(), conteudo:t });
+        inputChat.value="";
+    };
+    if(btnEnviar) btnEnviar.addEventListener('click', enviar);
+    if(inputChat) inputChat.addEventListener('keypress', (e) => { if(e.key==='Enter') enviar(); });
 }
+// =========================================================
+// Fim chat
+// =========================================================
