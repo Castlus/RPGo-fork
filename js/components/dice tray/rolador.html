@@ -1,0 +1,39 @@
+<div id="diceTray" class="dice-tray collapsed">
+    
+    <div id="diceTrayHeader" class="tray-header">
+        <div class="header-left">
+            <i class="fas fa-dice-d20"></i> 
+            <span class="tray-label">Rolador</span>
+        </div>
+        <i id="trayIcon" class="fas fa-chevron-up"></i>
+    </div>
+
+    <div class="tray-body">
+        <div id="diceContainer" class="dice-grid-buttons">
+            <button id="btnToggleSign" class="dice-btn sign-btn" title="Alternar Somar/Subtrair">+</button>
+            <button class="dice-btn" data-faces="4">d4</button>
+            <button class="dice-btn" data-faces="6">d6</button>
+            <button class="dice-btn" data-faces="8">d8</button>
+            <button class="dice-btn" data-faces="10">d10</button>
+            <button class="dice-btn" data-faces="12">d12</button>
+            <button class="dice-btn" data-faces="20">d20</button>
+            <button class="dice-btn" data-faces="100">d100</button>
+        </div>
+
+        <div class="tray-footer">
+            <div style="flex: 1;">
+                <label style="font-size: 0.7rem; color: #666;">Modificador</label>
+                <input type="number" id="inputModificador" value="0" placeholder="+0">
+            </div>
+            <button id="btnLimparTray" class="clear-btn" title="Limpar"><i class="fas fa-trash"></i></button>
+        </div>
+
+        <button id="btnRolarTray" class="roll-btn">ROLAR!</button>
+
+        <div id="trayResult" class="tray-result-box">
+            <div style="font-size: 0.8rem; color: #aaa;">Resultado:</div>
+            <div id="txtTotal" style="font-size: 2rem; font-weight: 800; color: var(--primary);">--</div>
+            <div id="txtDetalhes" style="font-size: 0.85rem; color: #555; margin-top: 5px;">...</div>
+        </div>
+    </div>
+</div>
