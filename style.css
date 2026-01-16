@@ -805,3 +805,114 @@ body {
     .sidebar { height: auto; margin-bottom: 20px; }
     .dice-tray { width: 100%; right: 0; bottom: 0; border-radius: 0; }
 }
+
+/* --- MODAIS CUSTOMIZADOS --- */
+
+/* Modal de Confirmação */
+.modal-confirmation,
+.modal-notification,
+.modal-error {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+}
+
+.modal-overlay-confirm,
+.modal-overlay-notify,
+.modal-overlay-error {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+}
+
+.modal-box-confirm,
+.modal-box-notify,
+.modal-box-error {
+    background: var(--bg-card);
+    border-radius: 12px;
+    padding: 30px;
+    max-width: 400px;
+    width: 90%;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+    animation: slideUp 0.3s ease-out;
+}
+
+@keyframes slideUp {
+    from {
+        transform: translateY(20px);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+.modal-box-confirm h2,
+.modal-box-notify h2,
+.modal-box-error h2 {
+    margin: 0 0 15px 0;
+    color: var(--text-main);
+    font-size: 1.5rem;
+}
+
+.modal-box-confirm p,
+.modal-box-notify p,
+.modal-box-error p {
+    margin: 0;
+    color: var(--text-sec);
+    font-size: 1rem;
+    line-height: 1.5;
+}
+
+.modal-box-confirm button,
+.modal-box-notify button,
+.modal-box-error button {
+    transition: all 0.2s ease;
+}
+
+.modal-box-confirm button:hover,
+.modal-box-notify button:hover,
+.modal-box-error button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+}
+
+.modal-box-confirm button:active,
+.modal-box-notify button:active,
+.modal-box-error button:active {
+    transform: translateY(0);
+}
+
+/* Dark mode para modais */
+body.dark-mode .modal-box-confirm,
+body.dark-mode .modal-box-notify,
+body.dark-mode .modal-box-error {
+    background: var(--bg-card);
+    color: var(--text-main);
+}
+
+body.dark-mode .modal-box-confirm h2,
+body.dark-mode .modal-box-notify h2,
+body.dark-mode .modal-box-error h2 {
+    color: var(--text-main);
+}
+
+body.dark-mode .modal-box-confirm p,
+body.dark-mode .modal-box-notify p,
+body.dark-mode .modal-box-error p {
+    color: var(--text-sec);
+}
