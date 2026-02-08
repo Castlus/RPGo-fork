@@ -184,7 +184,7 @@ body {
 
 /* --- CONTEÚDO PRINCIPAL --- */
 .main-content {
-    overflow-y: auto;
+    overflow-y: scroll; /* Força scrollbar sempre visível para evitar pulos de layout */
     padding-right: 10px;
     padding-bottom: 80px; /* Espaço extra pra bandeja não cobrir tudo */
 }
@@ -223,6 +223,7 @@ body {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
     gap: 15px;
+    align-items: start; /* Impede que cards vizinhos estiquem verticalmente */
 }
 
 .action-card {
@@ -231,7 +232,7 @@ body {
     border-radius: 12px;
     padding: 15px;
     position: relative;
-    transition: transform 0.2s;
+    transition: transform 0.2s, box-shadow 0.3s ease;
     cursor: grab;
     display: flex;
     flex-direction: column;
@@ -251,8 +252,6 @@ body {
     color: #666; 
     line-height: 1.4; 
     flex-grow: 1;
-    /* Animação */
-    transition: max-height 0.4s ease;
     overflow: hidden;
 }
 
@@ -260,23 +259,27 @@ body {
 .action-card.collapsed .card-desc {
     display: -webkit-box;
     -webkit-line-clamp: 2;
+    line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
     text-overflow: ellipsis;
-    max-height: 2.8em; /* Altura para 2 linhas */
+    max-height: 3em; 
 }
 
 .action-card.expanded .card-desc {
     display: block;
-    max-height: 500px; /* Altura máxima arbitrária para permitir expansão */
+    /* max-height é controlado via JS para animação suave */
     -webkit-line-clamp: unset;
+    line-clamp: unset;
+    overflow: hidden;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
 }
 
 .card-tags { 
     display: flex; 
     gap: 5px; 
     flex-wrap: wrap;
-    /* Animação */
     transition: all 0.4s ease;
     overflow: hidden;
 }
@@ -915,4 +918,43 @@ body.dark-mode .modal-box-confirm p,
 body.dark-mode .modal-box-notify p,
 body.dark-mode .modal-box-error p {
     color: var(--text-sec);
+}
+/* --- BOTÕES GERAIS (INVENTÁRIO) --- */
+.btn-rect {
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-weight: bold;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: all 0.2s;
+    border: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+.btn-rect.primary {
+    background: var(--primary);
+    color: white;
+}
+.btn-rect.primary:hover {
+    filter: brightness(1.1);
+    transform: translateY(-2px);
+}
+
+.btn-rect.outline {
+    background: var(--bg-card);
+    color: var(--primary);
+    border: 1px solid var(--primary);
+}
+.btn-rect.outline:hover {
+    filter: brightness(0.95);
+    background: var(--bg-page);
+}
+
+/* Estado Ativo (Toggle) */
+.btn-rect.outline.active {
+    background: var(--primary);
+    color: white;
 }
