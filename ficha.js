@@ -5,6 +5,7 @@ import { iniciarBandejaDados } from "./js/components/dice tray/rolador.js";
 import { setupInventoryUI, carregarInventario } from "./js/components/inventory/inventario.js";
 import { carregarPerfil, configurarTema } from "./js/components/profile/perfil.js";
 import { carregarAcoes, setupTabsUI } from "./js/components/actions/acoes.js";
+import { iniciarChatTray } from "./js/components/chat/chat.js";
 
 const firebaseConfig = {
     apiKey: "AIzaSyBkp8ZUYMCfRokbpMl2fBGTvfMxzzvgaeY",
@@ -81,6 +82,20 @@ async function carregarComponenteAcoes() {
     }
 }
 
+// Carrega o componente de Chat
+async function carregarComponenteChat() {
+    const container = document.getElementById('chatTrayContainer');
+    if (container) {
+        try {
+            const response = await fetch('./js/components/chat/chat.html');
+            const html = await response.text();
+            container.innerHTML = html;
+        } catch (error) {
+            console.error('Erro ao carregar componente de chat:', error);
+        }
+    }
+}
+
 // SEGURANÇA
 onAuthStateChanged(auth, async (user) => {
     if (user) {
@@ -89,6 +104,7 @@ onAuthStateChanged(auth, async (user) => {
         await carregarComponentePerfil();
         await carregarComponenteAcoes();
         await carregarComponenteInventario();
+        await carregarComponenteChat();
         
         // Passa os refs do Firebase para os componentes
         const dbRefs = { db, ref, onValue, push, remove, update };
@@ -109,6 +125,9 @@ onAuthStateChanged(auth, async (user) => {
         
         // Inicializa a lógica da bandeja passando o user para salvar rolagem
         iniciarBandejaDados(user);
+        
+        // Inicializa o chat
+        iniciarChatTray(user, dbRefs);
     } else {
         window.location.href = "index.html";
     }
