@@ -184,7 +184,7 @@ body {
 
 /* --- CONTEÚDO PRINCIPAL --- */
 .main-content {
-    overflow-y: scroll; /* Força scrollbar sempre visível para evitar pulos de layout */
+    overflow-y: auto;
     padding-right: 10px;
     padding-bottom: 80px; /* Espaço extra pra bandeja não cobrir tudo */
 }
@@ -525,6 +525,150 @@ body {
     max-height: 80vh; 
     overflow-y: auto;
 }
+
+/* ======================================================= */
+/* --- CHAT TRAY (SMART DOCK — espelho do Dice Tray) --- */
+/* ======================================================= */
+.chat-tray {
+    position: fixed;
+    width: 320px;
+    background: white;
+    box-shadow: 0 5px 25px rgba(0,0,0,0.2);
+    border: 1px solid #ddd;
+    z-index: 9998; /* abaixo do dice tray (9999) */
+    display: flex;
+    flex-direction: column;
+    transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+
+/* 0. COLLAPSED BASE — garante que a bandeja fique fechada em qualquer posição (inclusive flutuando) */
+.chat-tray.collapsed {
+    height: 45px;
+    overflow: hidden;
+}
+
+/* 1. EM BAIXO (Padrão: Barra) */
+.chat-tray.dock-bottom {
+    border-radius: 12px 12px 0 0;
+    bottom: 0;
+}
+.chat-tray.dock-bottom.collapsed {
+    height: 45px !important;
+    overflow: hidden;
+}
+
+/* 2. LATERAIS (Esquerda/Direita) */
+.chat-tray.dock-side {
+    border-radius: 12px;
+}
+
+/* === MODO BOLINHA (RECOLHIDA NAS LATERAIS) === */
+.chat-tray.dock-side.collapsed {
+    width: 50px !important;
+    height: 50px !important;
+    border-radius: 50%;
+    overflow: hidden;
+    border: 2px solid var(--primary);
+    box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+}
+
+/* Header da bolinha: centraliza o ícone */
+.chat-tray.dock-side.collapsed .chat-header {
+    justify-content: center;
+    padding: 0;
+    height: 100%;
+    border-radius: 50%;
+}
+.chat-tray.dock-side.collapsed .chat-label { display: none; }
+.chat-tray.dock-side.collapsed .chat-header .header-left i { display: none; }
+.chat-tray.dock-side.collapsed #chatIcon {
+    font-size: 1.6rem;
+    margin: 0;
+}
+
+/* Header padrão */
+.chat-header {
+    background: var(--primary);
+    color: white;
+    padding: 12px 15px;
+    cursor: grab;
+    font-weight: 700;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    height: 45px;
+    user-select: none;
+    flex-shrink: 0;
+    border-radius: 12px 12px 0 0;
+}
+.chat-header:active { cursor: grabbing; }
+
+/* Corpo do chat */
+.chat-body {
+    padding: 15px;
+    background: #f8f9fa;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    max-height: 80vh;
+    overflow: hidden;
+}
+
+/* Área de mensagens */
+.chat-messages {
+    flex: 1;
+    overflow-y: auto;
+    min-height: 200px;
+    max-height: 380px;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.chat-message {
+    font-size: 0.85rem;
+    color: var(--text-main);
+    padding: 6px 10px;
+    background: white;
+    border-radius: 6px;
+    border-left: 3px solid var(--primary);
+    word-break: break-word;
+}
+
+/* Input + botão enviar */
+.chat-input-row {
+    display: flex;
+    gap: 8px;
+}
+.chat-input-row input {
+    flex: 1;
+    padding: 8px 10px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    outline: none;
+}
+.chat-input-row input:focus { border-color: var(--primary); }
+.chat-input-row button {
+    background: var(--primary);
+    color: white;
+    border: none;
+    padding: 8px 14px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 1rem;
+    transition: 0.2s;
+}
+.chat-input-row button:hover { filter: brightness(1.15); }
+
+/* Dark mode para chat */
+body.dark-mode .chat-tray { background: #1e1e1e; border-color: #333; }
+body.dark-mode .chat-body { background: #121212; }
+body.dark-mode .chat-message { background: #2d2d2d; color: #e0e0e0; }
+body.dark-mode .chat-input-row input {
+    background: #2d2d2d; color: white; border-color: #444;
+}
+
 /* --- DASHBOARD (LAYOUT ESBOÇO + DESIGN PREMIUM) --- */
 .dashboard-container {
     max-width: 1200px;

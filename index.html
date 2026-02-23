@@ -38,11 +38,26 @@
             color: white;
             font-weight: bold;
         }
-        #btnLogin { background-color: #d32f2f; }
+        #btnLogin { background-color: #d32f2f; width: 100%; }
         #btnLogin:hover { background-color: #b71c1c; }
         
-        #btnCriarConta { background-color: #555; }
+        #btnCriarConta { background-color: #555; width: 100%; }
         #btnCriarConta:hover { background-color: #333; }
+
+        #toggleModo {
+            background: none;
+            border: none;
+            color: #5a3a22;
+            font-size: 0.85em;
+            cursor: pointer;
+            text-decoration: underline;
+            margin-top: 12px;
+            display: block;
+            width: 100%;
+        }
+        #toggleModo:hover { color: #333; }
+
+        #campoConfirmarSenha { display: none; }
     </style>
 </head>
 
@@ -61,15 +76,42 @@
         <label for="password" style="display:block; text-align:left;">Senha:</label>
         <input type="password" id="password" placeholder="******">
 
-        <div style="display: flex; gap: 10px; margin-top: 20px; justify-content: center;">
-            <button id="btnLogin">Entrar</button>
-            <button id="btnCriarConta">Criar Conta</button>
+        <div id="campoConfirmarSenha">
+            <label for="confirmPassword" style="display:block; text-align:left;">Confirmar Senha:</label>
+            <input type="password" id="confirmPassword" placeholder="Repita a senha">
         </div>
+
+        <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 20px;">
+            <button id="btnLogin">Entrar</button>
+            <button id="btnCriarConta" style="display:none;">Criar Conta</button>
+        </div>
+
+        <button id="toggleModo">Não tem conta? Cadastre-se</button>
         
         <p id="msgErro" style="color: red; margin-top: 15px; font-size: 0.9em;"></p>
     </div>
 
-    <script type="module" src="auth.js"></script>
+    <script type="module" src="js/auth.js"></script>
+
+    <script>
+        // Alterna entre modo Login e modo Cadastro
+        const toggleBtn = document.getElementById('toggleModo');
+        const btnLogin = document.getElementById('btnLogin');
+        const btnCriar = document.getElementById('btnCriarConta');
+        const campoConfirmar = document.getElementById('campoConfirmarSenha');
+        let modoCadastro = false;
+
+        toggleBtn.addEventListener('click', () => {
+            modoCadastro = !modoCadastro;
+            btnLogin.style.display     = modoCadastro ? 'none'  : 'block';
+            btnCriar.style.display     = modoCadastro ? 'block' : 'none';
+            campoConfirmar.style.display = modoCadastro ? 'block' : 'none';
+            toggleBtn.textContent = modoCadastro
+                ? 'Já tem conta? Faça login'
+                : 'Não tem conta? Cadastre-se';
+            document.getElementById('msgErro').innerText = '';
+        });
+    </script>
 
 </body>
 </html>

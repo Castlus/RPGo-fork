@@ -1,5 +1,5 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { getDatabase, ref, onValue, push, remove, update } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+import { getDatabase, ref, get, onValue, push, remove, update, query, orderByChild } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 import { iniciarBandejaDados } from "./js/components/dice tray/rolador.js";
 import { setupInventoryUI, carregarInventario } from "./js/components/inventory/inventario.js";
@@ -107,7 +107,7 @@ onAuthStateChanged(auth, async (user) => {
         await carregarComponenteChat();
         
         // Passa os refs do Firebase para os componentes
-        const dbRefs = { db, ref, onValue, push, remove, update };
+        const dbRefs = { db, ref, get, onValue, push, remove, update, query, orderByChild };
         
         // Inicializa componentes
         carregarPerfil(user.uid, dbRefs);
@@ -125,9 +125,18 @@ onAuthStateChanged(auth, async (user) => {
         
         // Inicializa a lógica da bandeja passando o user para salvar rolagem
         iniciarBandejaDados(user);
-        
+
         // Inicializa o chat
         iniciarChatTray(user, dbRefs);
+
+        // Logout — configurado aqui pois o botão está dentro do perfil.html,
+        // que é carregado dinamicamente. DOMContentLoaded já foi disparado antes disso.
+        const btnSair = document.getElementById('btnSair');
+        if (btnSair) {
+            btnSair.addEventListener('click', () => {
+                signOut(auth).then(() => { window.location.href = 'index.html'; });
+            });
+        }
     } else {
         window.location.href = "index.html";
     }
@@ -173,15 +182,7 @@ function configurarEdicao(elementoId, campoBanco, elementoMaxId, uid) {
     });
 }
 
-// Logout
-document.addEventListener('DOMContentLoaded', () => {
-    const btnSair = document.getElementById('btnSair');
-    if (btnSair) {
-        btnSair.addEventListener('click', () => {
-            signOut(auth).then(() => { window.location.href = "index.html"; });
-        });
-    }
-});
+// (logout configurado dinamicamente dentro de onAuthStateChanged, após carga do perfil)
 
 // =========================================================
 // FIM DO ARQUIVO

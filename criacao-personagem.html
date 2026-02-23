@@ -31,9 +31,8 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
         import { getDatabase, ref, set } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
-        import { getAuth } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+        import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
-        
         const firebaseConfig = { 
             apiKey: "AIzaSyBkp8ZUYMCfRokbpMl2fBGTvfMxzzvgaeY",
             authDomain: "rpgo-onepiece.firebaseapp.com",
@@ -49,28 +48,49 @@
         const db = getDatabase(app);
         const auth = getAuth(app);
 
-        document.getElementById('btnSalvarFicha').addEventListener('click', () => {
-            const user = auth.currentUser;
-            if(user) {
-                
+        // Proteção de rota: aguarda a sessão do Firebase ser restaurada.
+        // Sem isso, auth.currentUser é null e o botão falha silenciosamente.
+        onAuthStateChanged(auth, (user) => {
+            if (!user) {
+                // Usuário não está logado — redireciona para login
+                window.location.href = 'index.html';
+                return;
+            }
+
+            document.getElementById('btnSalvarFicha').addEventListener('click', () => {
+                const nome = document.getElementById('nome').value.trim();
+                if (!nome) {
+                    alert('Dê um nome ao seu personagem!');
+                    return;
+                }
+
+                const hpMax = Number(document.getElementById('hpMax').value) || 0;
+                const ppMax = Number(document.getElementById('ppMax').value) || 0;
+
+                // set() é seguro aqui pois só chegamos nesta página quando o nó
+                // do usuário ainda não existe no Firebase (verificado em auth.js).
                 set(ref(db, 'users/' + user.uid), {
-                    nome: document.getElementById('nome').value,
-                    hpMax: Number(document.getElementById('hpMax').value),
-                    hpAtual: Number(document.getElementById('hpMax').value), 
-                    ppMax: Number(document.getElementById('ppMax').value),
-                    ppAtual: Number(document.getElementById('ppMax').value),
+                    nome: nome,
+                    hpMax: hpMax,
+                    hpAtual: hpMax,
+                    ppMax: ppMax,
+                    ppAtual: ppMax,
+                    nivel: 1,
                     atributos: {
-                        forca: Number(document.getElementById('forca').value),
-                        destreza: Number(document.getElementById('destreza').value),
-                        constituicao: Number(document.getElementById('constituicao').value),
-                        sabedoria: Number(document.getElementById('sabedoria').value),
-                        vontade: Number(document.getElementById('vontade').value),
-                        presenca: Number(document.getElementById('presenca').value)
+                        forca:        Number(document.getElementById('forca').value) || 0,
+                        destreza:     Number(document.getElementById('destreza').value) || 0,
+                        constituicao: Number(document.getElementById('constituicao').value) || 0,
+                        sabedoria:    Number(document.getElementById('sabedoria').value) || 0,
+                        vontade:      Number(document.getElementById('vontade').value) || 0,
+                        presenca:     Number(document.getElementById('presenca').value) || 0
                     }
                 }).then(() => {
-                    window.location.href = "ficha.html";
+                    window.location.href = 'ficha.html';
+                }).catch((erro) => {
+                    console.error('Erro ao salvar ficha:', erro);
+                    alert('Erro ao salvar personagem. Tente novamente.');
                 });
-            }
+            });
         });
     </script>
 </body>
