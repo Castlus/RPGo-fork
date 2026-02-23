@@ -1,21 +1,19 @@
 /**
  * Configura a interface do inventário
- * @param {string} uid - ID do usuário no Firebase
- * @param {Object} dbRefs - Objeto com funções Firebase { ref, onValue, push, remove, update }
+ * @param {string} uid - ID do usuário (Supabase)
  */
 import { notificar, confirmar } from "../../utils/modal-utils.js";
+import { supabase, apiGet, apiPost, apiPatch, apiDelete } from "../../utils/api.js";
 
 // Estado global do módulo para permitir re-renderização
 let inventarioState = {
-    itens: {},
+    itens: [],
     mostrarEquipados: false,
     uid: null,
-    dbRefs: null,
     categoriaAtual: 'section-arsenal'
 };
 
-export function setupInventoryUI(uid, dbRefs) {
-    const { ref, onValue } = dbRefs;
+export function setupInventoryUI(uid) {
     
     // ABAS
     const tabs = document.querySelectorAll('.tab');
@@ -187,10 +185,10 @@ export function setupInventoryUI(uid, dbRefs) {
                 // Remove undefined keys
                 Object.keys(itemData).forEach(key => itemData[key] === undefined && delete itemData[key]);
 
-                if(editingItemId) {
-                    dbRefs.update(ref(dbRefs.db, 'users/' + uid + '/inventario/' + editingItemId), itemData);
+                if (editingItemId) {
+                    apiPatch(`/users/${uid}/inventario/${editingItemId}`, itemData).catch(console.error);
                 } else {
-                    dbRefs.push(ref(dbRefs.db, 'users/' + uid + '/inventario'), itemData);
+                    apiPost(`/users/${uid}/inventario`, itemData).catch(console.error);
                 }
 
                 modalItem.style.display = 'none';
@@ -203,39 +201,42 @@ export function setupInventoryUI(uid, dbRefs) {
 
 /**
  * Carrega e exibe o inventário do usuário
- * @param {string} uid - ID do usuário no Firebase
- * @param {Object} dbRefs - Objeto com funções Firebase { db, ref, onValue, remove, update }
+ * @param {string} uid - ID do usuário (Supabase)
  */
-export function carregarInventario(uid, dbRefs) {
-    const { db, ref, onValue } = dbRefs;
-    
-    // Atualiza estado global
+export function carregarInventario(uid) {
     inventarioState.uid = uid;
-    inventarioState.dbRefs = dbRefs;
-    
-    const invRef = ref(db, 'users/' + uid + '/inventario');
-    const cargaRef = ref(db, 'users/' + uid + '/cargaMaxima');
 
-    // Carrega Carga Máxima
-    onValue(cargaRef, (snapshot) => {
-        const max = snapshot.val() || 20;
+    // Carrega Carga Máxima do personagem
+    apiGet(`/users/${uid}`).then(p => {
         const elMax = document.getElementById('maxPeso');
-        if(elMax) elMax.innerText = max;
-    });
-    
-    // Carrega Itens e renderiza
-    onValue(invRef, (snapshot) => {
-        inventarioState.itens = snapshot.val() || {};
-        renderizarItens();
-    });
+        if (elMax && p?.cargaMaxima != null) elMax.innerText = p.cargaMaxima;
+    }).catch(console.error);
+
+    // Carga inicial dos itens
+    function recarregar() {
+        apiGet(`/users/${uid}/inventario`).then(itens => {
+            // Converte array → mapa {id: item} para compatibilidade com renderizarItens
+            const mapa = {};
+            (itens || []).forEach(item => { mapa[item.id] = item; });
+            inventarioState.itens = mapa;
+            renderizarItens();
+        }).catch(console.error);
+    }
+    recarregar();
+
+    // Realtime
+    supabase.channel(`inventario-${uid}`)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'itens', filter: `personagem_id=eq.${uid}` },
+            recarregar)
+        .subscribe();
 }
 
 /**
  * Função interna para renderizar as listas baseado no estado atual
  */
 function renderizarItens() {
-    const { itens, mostrarEquipados, uid, dbRefs } = inventarioState;
-    if(!dbRefs) return; 
+    const { itens, mostrarEquipados, uid } = inventarioState;
+    if (!uid) return;
 
     // Containers
     const listaFavoritos = document.getElementById('lista-favoritos');
@@ -379,40 +380,30 @@ function renderizarItens() {
     }
 
     atualizarPeso(pesoTotal);
-    setupItemListeners(uid, dbRefs, itens);
+    setupItemListeners(uid, itens);
 }
 
-function setupItemListeners(uid, dbRefs, itens) {
-    const { db, ref, remove, update } = dbRefs;
-
+function setupItemListeners(uid, itens) {
     document.querySelectorAll('.btn-favorite-item').forEach(btn => {
         btn.addEventListener('click', (e) => {
             e.stopPropagation();
-            
             const isFav = e.target.getAttribute('data-favorito') === 'true';
             const card = btn.closest('.action-card');
-            
-            if(card) {
+            if (card) {
                 card.style.boxShadow = !isFav ? 'inset 0 0 0 2px #d4af37' : 'none';
                 btn.style.color = !isFav ? '#d4af37' : '#ccc';
             }
-
             const id = e.target.getAttribute('data-id');
-            update(ref(db, 'users/' + uid + '/inventario/' + id), { favorito: !isFav });
+            apiPatch(`/users/${uid}/inventario/${id}`, { favorito: !isFav }).catch(console.error);
         });
     });
 
     document.querySelectorAll('.btn-delete-item').forEach(btn => {
         btn.addEventListener('click', async (e) => {
             e.stopPropagation();
-            const confirmado = await confirmar(
-                "Deletar Item",
-                "Tem certeza que quer apagar este item?",
-                "Deletar",
-                "Cancelar"
-            );
-            if(confirmado) {
-                remove(ref(db, 'users/' + uid + '/inventario/' + e.target.getAttribute('data-id')));
+            const confirmado = await confirmar("Deletar Item", "Tem certeza que quer apagar este item?", "Deletar", "Cancelar");
+            if (confirmado) {
+                apiDelete(`/users/${uid}/inventario/${e.target.getAttribute('data-id')}`).catch(console.error);
             }
         });
     });
@@ -421,30 +412,26 @@ function setupItemListeners(uid, dbRefs, itens) {
         btn.addEventListener('click', (e) => {
             e.stopPropagation();
             const id = e.target.getAttribute('data-id');
-            const item = itens[id];
-            window.abrirModalItem(item, id);
+            window.abrirModalItem(itens[id], id);
         });
     });
 
     document.querySelectorAll('.btn-equip').forEach(btn => {
         btn.addEventListener('click', (e) => {
             e.stopPropagation();
-            const id = e.target.getAttribute('data-id');
-            const tipo = e.target.getAttribute('data-tipo');
+            const id          = e.target.getAttribute('data-id');
+            const tipo        = e.target.getAttribute('data-tipo');
             const estaEquipado = e.target.getAttribute('data-equipado') === 'true';
-            
-            if(!estaEquipado) {
-                // Se for armadura, só pode ter uma equipada por vez
-                if (tipo === 'armadura') {
-                    Object.entries(itens || {}).forEach(([k, v]) => {
-                        if(v.tipo === tipo && v.equipado) {
-                            update(ref(db, 'users/' + uid + '/inventario/' + k), { equipado: false });
-                        }
-                    });
-                }
-            }
 
-            update(ref(db, 'users/' + uid + '/inventario/' + id), { equipado: !estaEquipado });
+            if (!estaEquipado && tipo === 'armadura') {
+                // Desequipa outras armaduras antes
+                Object.entries(itens || {}).forEach(([k, v]) => {
+                    if (v.tipo === 'armadura' && v.equipado) {
+                        apiPatch(`/users/${uid}/inventario/${k}`, { equipado: false }).catch(console.error);
+                    }
+                });
+            }
+            apiPatch(`/users/${uid}/inventario/${id}`, { equipado: !estaEquipado }).catch(console.error);
         });
     });
 
