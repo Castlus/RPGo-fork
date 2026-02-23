@@ -12,19 +12,17 @@ const msgErro = document.getElementById('msgErro');
 // 4. Tradução de erros Supabase → mensagens em português
 function traduzirErro(mensagem = '') {
     const m = mensagem.toLowerCase();
-    if (m.includes('invalid login credentials')  m.includes('invalid email or password'))
+    if (m.includes('invalid login credentials') || m.includes('invalid email or password'))
         return 'E-mail ou senha incorretos.';
     if (m.includes('email not confirmed'))
         return 'Confirme seu e-mail antes de entrar.';
-    if (m.includes('user already registered') 
- m.includes('already been registered'))
+    if (m.includes('user already registered') || m.includes('already been registered'))
         return 'Este e-mail já está cadastrado.';
     if (m.includes('password should be at least'))
         return 'Senha muito fraca (mínimo 6 caracteres).';
-    if (m.includes('rate limit')  m.includes('too many requests'))
+    if (m.includes('rate limit') || m.includes('too many requests'))
         return 'Muitas tentativas. Tente novamente mais tarde.';
-    if (m.includes('failed to fetch') 
- m.includes('network'))
+    if (m.includes('failed to fetch') || m.includes('network'))
         return 'Sem conexão com a internet.';
     if (m.includes('invalid email'))
         return 'E-mail inválido.';
