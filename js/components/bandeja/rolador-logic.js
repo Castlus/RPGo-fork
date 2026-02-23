@@ -1,13 +1,11 @@
 /**
  * Lógica do Rolador de Dados — componente interno da Bandeja Unificada.
  *
- * @param {Object} user      - Objeto do usuário autenticado ({ uid })
- * @param {Object} dbRefs    - { db, ref, update }
+ * @param {Object} user      - Objeto do usuário autenticado ({ id })
  * @param {Object} callbacks - { onRolar(dadosRolagem) } — chamado após cada rolagem
- *                             para que o orquestrador (bandeja.js) envie ao chat
  */
-export function iniciarRolador(user, dbRefs, callbacks = {}) {
-    const { db, ref, update } = dbRefs;
+import { apiPatch } from '../../utils/api.js';
+export function iniciarRolador(user, callbacks = {}) {
     const { onRolar } = callbacks;
 
     let dadosSelecionados = [];
@@ -111,7 +109,7 @@ export function iniciarRolador(user, dbRefs, callbacks = {}) {
         txtDetalhes.innerHTML = `[${total}] = ${stringFinal}`;
 
         // Salva última rolagem no perfil do usuário
-        update(ref(db, `users/${user.uid}`), {
+        apiPatch(`/users/${user.id}`, {
             ultimaRolagem: `[${total}] = ${stringFinal.replace(/<[^>]*>?/gm, '')}`
         });
 
