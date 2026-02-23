@@ -1,23 +1,5 @@
 // 1. Imports
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-import { getDatabase, ref, get } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
-
-// 2. Configuração
-const firebaseConfig = {
-  apiKey: "AIzaSyBkp8ZUYMCfRokbpMl2fBGTvfMxzzvgaeY",
-  authDomain: "rpgo-onepiece.firebaseapp.com",
-  databaseURL: "https://rpgo-onepiece-default-rtdb.firebaseio.com",
-  projectId: "rpgo-onepiece",
-  storageBucket: "rpgo-onepiece.firebasestorage.app",
-  messagingSenderId: "726770644982",
-  appId: "1:726770644982:web:7c06f46940cc5142c3f9d7",
-  measurementId: "G-HSBMTMB5XK"
-};
-
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getDatabase(app);
+import { supabase, apiGet } from './utils/api.js';
 
 // 3. Elementos da Tela
 const emailInput = document.getElementById('email');
@@ -27,20 +9,24 @@ const btnLogin = document.getElementById('btnLogin');
 const btnCriar = document.getElementById('btnCriarConta');
 const msgErro = document.getElementById('msgErro');
 
-// 4. Mapa de erros Firebase → mensagens em português
-const ERROS = {
-    'auth/invalid-email':            'E-mail inválido.',
-    'auth/user-not-found':           'Usuário não encontrado.',
-    'auth/wrong-password':           'Senha incorreta.',
-    'auth/invalid-credential':       'E-mail ou senha incorretos.',
-    'auth/email-already-in-use':     'Este e-mail já está cadastrado.',
-    'auth/weak-password':            'Senha muito fraca (mínimo 6 caracteres).',
-    'auth/too-many-requests':        'Muitas tentativas. Tente novamente mais tarde.',
-    'auth/network-request-failed':   'Sem conexão com a internet.',
-};
-
-function traduzirErro(codigo) {
-    return ERROS[codigo] || 'Ocorreu um erro. Tente novamente.';
+// 4. Tradução de erros Supabase → mensagens em português
+function traduzirErro(mensagem = '') {
+    const m = mensagem.toLowerCase();
+    if (m.includes('invalid login credentials') || m.includes('invalid email or password'))
+        return 'E-mail ou senha incorretos.';
+    if (m.includes('email not confirmed'))
+        return 'Confirme seu e-mail antes de entrar.';
+    if (m.includes('user already registered') || m.includes('already been registered'))
+        return 'Este e-mail já está cadastrado.';
+    if (m.includes('password should be at least'))
+        return 'Senha muito fraca (mínimo 6 caracteres).';
+    if (m.includes('rate limit') || m.includes('too many requests'))
+        return 'Muitas tentativas. Tente novamente mais tarde.';
+    if (m.includes('failed to fetch') || m.includes('network'))
+        return 'Sem conexão com a internet.';
+    if (m.includes('invalid email'))
+        return 'E-mail inválido.';
+    return 'Ocorreu um erro. Tente novamente.';
 }
 
 function setLoading(ativo) {
@@ -66,23 +52,26 @@ function validarCampos(...campos) {
 
 // 5. Botão de Login
 if (btnLogin) {
-    btnLogin.addEventListener('click', () => {
+    btnLogin.addEventListener('click', async () => {
         mostrarErro('');
         if (!validarCampos(emailInput, senhaInput)) return;
 
         setLoading(true);
-        signInWithEmailAndPassword(auth, emailInput.value.trim(), senhaInput.value)
-            .catch(erro => {
-                console.error(erro);
-                mostrarErro(traduzirErro(erro.code));
-                setLoading(false);
-            });
+        const { error } = await supabase.auth.signInWithPassword({
+            email: emailInput.value.trim(),
+            password: senhaInput.value
+        });
+        if (error) {
+            mostrarErro(traduzirErro(error.message));
+            setLoading(false);
+        }
+        // Redirecionamento fica a cargo do onAuthStateChange abaixo
     });
 }
 
 // 6. Botão de Criar Conta
 if (btnCriar) {
-    btnCriar.addEventListener('click', () => {
+    btnCriar.addEventListener('click', async () => {
         mostrarErro('');
         if (!validarCampos(emailInput, senhaInput, confirmaSenhaInput)) return;
 
@@ -93,33 +82,31 @@ if (btnCriar) {
         }
 
         setLoading(true);
-        createUserWithEmailAndPassword(auth, emailInput.value.trim(), senhaInput.value)
-            .catch(erro => {
-                console.error(erro);
-                mostrarErro(traduzirErro(erro.code));
-                setLoading(false);
-            });
+        const { error } = await supabase.auth.signUp({
+            email: emailInput.value.trim(),
+            password: senhaInput.value
+        });
+        if (error) {
+            mostrarErro(traduzirErro(error.message));
+            setLoading(false);
+        }
+        // Supabase envia e-mail de confirmação por padrão.
+        // Se "Confirm email" estiver desativado no projeto, onAuthStateChange dispara imediatamente.
     });
 }
 
 // 7. Observador — redireciona após login/cadastro bem-sucedido
-onAuthStateChanged(auth, (user) => {
-    if (user) {
-        console.log('Usuário logado:', user.uid);
-        const userRef = ref(db, 'users/' + user.uid);
+supabase.auth.onAuthStateChange(async (_event, session) => {
+    if (session?.user) {
+        const user = session.user;
+        console.log('Usuário logado:', user.id);
 
-        get(userRef)
-            .then((snapshot) => {
-                if (snapshot.exists()) {
-                    window.location.href = 'ficha.html';
-                } else {
-                    window.location.href = 'criacao-personagem.html';
-                }
-            })
-            .catch((erro) => {
-                console.error('Erro ao verificar ficha:', erro);
-                mostrarErro('Erro ao verificar dados. Tente novamente.');
-                setLoading(false);
-            });
+        try {
+            await apiGet(`/users/${user.id}`);
+            window.location.href = 'ficha.html';
+        } catch (e) {
+            // 404 → ainda não tem personagem
+            window.location.href = 'criacao-personagem.html';
+        }
     }
 });

@@ -1,30 +1,23 @@
 /**
- * Inicializa a lógica da Bandeja de Chat com Firebase e detecção de colisão.
+ * Inicializa a lógica da Bandeja de Chat com Supabase e detecção de colisão.
  * O chat é compartilhado entre todos os jogadores via SESSION_ID fixo ('mesa-principal').
  *
- * @param {Object} user    - Objeto do usuário autenticado ({ uid, displayName, email })
- * @param {Object} dbRefs  - Referências Firebase: { db, ref, onValue, push, remove, query, orderByChild }
+ * @param {Object} user    - Objeto do usuário autenticado ({ id, email })
  *
  * REQUISITO: o HTML do componente (chat.html) deve ser injetado no DOM
  * ANTES desta função ser chamada (ver carregarComponenteChat em ficha.js).
  */
-export function iniciarChatTray(user, dbRefs) {
-    const { db, ref, get, onValue, push, remove, query, orderByChild } = dbRefs;
+import { supabase, apiGet, apiPost, apiDelete } from "../../utils/api.js";
 
+export function iniciarChatTray(user) {
     // ID da sessão compartilhada entre todos os jogadores.
-    // Todos leem e escrevem no mesmo nó do Firebase.
-    // Para suporte a múltiplas mesas no futuro, basta tornar esse valor dinâmico.
     const SESSION_ID = 'mesa-principal';
 
-    // Nome do personagem buscado do Firebase (fallback para e-mail)
+    // Nome do personagem buscado do backend (fallback para e-mail)
     let nomePersonagem = user.email || 'Anônimo';
-    get(ref(db, `users/${user.uid}`)).then((snap) => {
-        if (snap.exists() && snap.val().nome) {
-            nomePersonagem = snap.val().nome;
-        }
+    apiGet(`/users/${user.id}`).then((p) => {
+        if (p.nome) nomePersonagem = p.nome;
     }).catch(() => {});
-
-    console.log('iniciarChatTray chamado para user:', user.uid);
     // ELEMENTOS
     const chatTray = document.getElementById('chatTray');
     const header   = document.getElementById('chatTrayHeader');
@@ -151,12 +144,9 @@ export function iniciarChatTray(user, dbRefs) {
 
     // --- FUNÇÃO: LIMPAR TODAS AS MENSAGENS ---
     function limparMensagens() {
-        const messagesRef = ref(db, `sessions/${SESSION_ID}/mensagens`);
-        
         const confirmacao = confirm('Tem certeza que deseja apagar TODAS as mensagens? Esta ação não pode ser desfeita.');
-        
         if (confirmacao) {
-            remove(messagesRef).then(() => {
+            apiDelete(`/mensagens/${SESSION_ID}`).then(() => {
                 console.log('✓ Todas as mensagens foram apagadas');
                 alert('✓ Histórico de mensagens apagado com sucesso');
             }).catch((error) => {
@@ -166,13 +156,13 @@ export function iniciarChatTray(user, dbRefs) {
         }
     }
 
-    // --- FUNÇÃO: ENVIAR MENSAGEM PARA FIREBASE ---
+    // --- FUNÇÃO: ENVIAR MENSAGEM PARA O BACKEND ---
     function enviarMensagem() {
         const chatInput = document.getElementById('chatInput');
         const mensagem = chatInput.value.trim();
-        
+
         console.log('Tentando enviar mensagem:', mensagem);
-        
+
         if (!mensagem) {
             console.log('Mensagem vazia');
             return;
@@ -186,36 +176,25 @@ export function iniciarChatTray(user, dbRefs) {
             return;
         }
 
-        try {
-            const timestamp = new Date().toISOString();
-            const messagesRef = ref(db, `sessions/${SESSION_ID}/mensagens`);
-            
-            console.log('Enviando para Firebase...');
-            
-            push(messagesRef, {
-                uid: user.uid,
-                nome: nomePersonagem,
-                mensagem: mensagem,
-                timestamp: timestamp
-            }).then(() => {
-                console.log('Mensagem enviada com sucesso');
-                chatInput.value = '';
-                chatInput.focus();
-            }).catch((error) => {
-                console.error('Erro ao enviar mensagem:', error);
-                alert('Erro ao enviar: ' + error.message);
-            });
-        } catch (error) {
-            console.error('Erro na função enviarMensagem:', error);
-            alert('Erro: ' + error.message);
-        }
+        console.log('Enviando para backend...');
+        apiPost(`/mensagens/${SESSION_ID}`, {
+            nome: nomePersonagem,
+            mensagem,
+            tipo: 'texto'
+        }).then(() => {
+            console.log('Mensagem enviada com sucesso');
+            chatInput.value = '';
+            chatInput.focus();
+        }).catch((error) => {
+            console.error('Erro ao enviar mensagem:', error);
+            alert('Erro ao enviar: ' + error.message);
+        });
     }
 
     // --- FUNÇÃO: CARREGAR MENSAGENS ---
-    // Guarda a função de cancelamento do listener ativo.
-    // Deve ser chamada antes de registrar um novo listener para evitar duplicação
-    // (e consequente renderização múltipla de mensagens a cada abertura do chat).
-    let unsubscribeMensagens = null;
+    // Guarda o canal Supabase Realtime ativo.
+    // É removido e recriado a cada abertura para evitar listeners duplicados.
+    let chatChannel = null;
 
     function carregarMensagens() {
         const messagesContainer = document.getElementById('chatMessages');
@@ -225,44 +204,32 @@ export function iniciarChatTray(user, dbRefs) {
             return;
         }
 
-        // Cancela o listener anterior antes de registrar um novo
-        if (unsubscribeMensagens) {
-            unsubscribeMensagens();
-            unsubscribeMensagens = null;
+        // Remove canal anterior antes de criar um novo
+        if (chatChannel) {
+            supabase.removeChannel(chatChannel);
+            chatChannel = null;
         }
 
-        // Ordena por timestamp para garantir ordem cronológica independente da chave Firebase
-        const mensagensQuery = query(
-            ref(db, `sessions/${SESSION_ID}/mensagens`),
-            orderByChild('timestamp')
-        );
+        async function fetchERenderizar() {
+            const msgs = await apiGet(`/mensagens/${SESSION_ID}`).catch(() => []);
 
-        unsubscribeMensagens = onValue(mensagensQuery, (snapshot) => {
-            if (!snapshot.exists()) {
+            if (!msgs || msgs.length === 0) {
                 messagesContainer.innerHTML = '<p style="color: #999; text-align: center; font-size: 0.9rem;">Nenhuma mensagem ainda...</p>';
                 return;
             }
 
-            const dados = snapshot.val();
-            if (!dados) return;
-
             let html = '';
-
-            Object.entries(dados).forEach(([key, msg]) => {
+            msgs.forEach(msg => {
                 if (!msg || !msg.timestamp) return;
 
-                const hora = new Date(msg.timestamp).toLocaleTimeString('pt-BR', { 
-                    hour: '2-digit', 
-                    minute: '2-digit' 
-                });
-                
-                const isSent = msg.uid === user.uid;
+                const hora = new Date(msg.timestamp).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+                const isSent = msg.uid === user.id;
                 const nomeExibido = isSent ? 'Você' : msg.nome;
-                
-                // Renderiza mensagem de rolagem de dados
+
                 if (msg.tipo === 'rolagem' && msg.detalhes) {
+                    const detalhes = Array.isArray(msg.detalhes) ? msg.detalhes : Object.values(msg.detalhes);
                     let detalhesHtml = '';
-                    msg.detalhes.forEach((d) => {
+                    detalhes.forEach((d) => {
                         const sinalTexto = d.sinal === -1 ? '-' : '+';
                         detalhesHtml += `<span class="roll-detail">${sinalTexto} ${d.resultado}d${d.faces}</span>`;
                     });
@@ -280,19 +247,28 @@ export function iniciarChatTray(user, dbRefs) {
                         </div>
                     `;
                 } else {
-                    // Mensagem de texto normal
                     html += `<div class="chat-message">${hora} <strong>${nomeExibido}</strong>: ${msg.mensagem}</div>`;
                 }
             });
 
             if (html) {
                 messagesContainer.innerHTML = html;
-                // Auto-scroll para a última mensagem
                 messagesContainer.scrollTop = messagesContainer.scrollHeight;
             }
-        }, (error) => {
-            console.error('Chat: erro ao carregar mensagens:', error);
-        });
+        }
+
+        // Carga inicial
+        fetchERenderizar();
+
+        // Supabase Realtime: re-renderiza em qualquer INSERT ou DELETE na sessão
+        chatChannel = supabase.channel(`chat-${SESSION_ID}`)
+            .on('postgres_changes', {
+                event: '*',
+                schema: 'public',
+                table: 'mensagens',
+                filter: `session_id=eq.${SESSION_ID}`
+            }, fetchERenderizar)
+            .subscribe();
     }
 
     // --- FUNÇÃO: ATUALIZAR ÍCONE CONFORME ESTADO E POSIÇÃO ---
