@@ -1,7 +1,8 @@
 /**
  * Inicializa a lógica da Bandeja de Dados (Dice Tray)
- * @param {Object} user - Objeto do usuário com propriedade uid para salvar rolagens no Firebase
+ * @param {Object} user - Objeto do usuário autenticado com propriedade id
  */
+import { apiPatch } from "../../utils/api.js";
 export function iniciarBandejaDados(user) {
     let dadosSelecionados = [];
     let modoNegativo = false;
@@ -432,9 +433,9 @@ export function iniciarBandejaDados(user) {
 
         const textoLimpo = `[${total}] = ${stringFinal.replace(/<[^>]*>?/gm, '')}`;
         
-        // Salva a rolagem no Firebase
-        if(user && user.uid) {
-            window.updateDB(window.dbRef('users/' + user.uid), { ultimaRolagem: textoLimpo });
+        // Salva a última rolagem no backend
+        if (user && user.id) {
+            apiPatch(`/users/${user.id}`, { ultimaRolagem: textoLimpo }).catch(console.error);
         }
         
         dadosSelecionados = [];
