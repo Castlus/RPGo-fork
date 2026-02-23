@@ -1,22 +1,25 @@
 /**
  * Carrega e gerencia as ações do personagem
- * @param {string} uid - ID do usuário (Supabase)
+ * @param {string} uid - ID do usuário no Firebase
+ * @param {Object} dbRefs - Objeto com funções Firebase { db, ref, onValue, push, remove }
  */
 import { confirmar, notificar } from "../../utils/modal-utils.js";
-import { supabase, apiGet, apiPost, apiDelete } from "../../utils/api.js";
 
-export function carregarAcoes(uid) {
-    // ─── Renderização ─────────────────────────────────────────────────────────
-    async function carregarERenderizar() {
-        const acoes = await apiGet(`/users/${uid}/acoes`).catch(() => []);
-
+export function carregarAcoes(uid, dbRefs) {
+    const { db, ref, onValue, push, remove } = dbRefs;
+    
+    // AÇÕES (CARDS)
+    const acoesRef = ref(db, 'users/' + uid + '/acoes');
+    onValue(acoesRef, (snapshot) => {
+        const acoes = snapshot.val();
+        
         document.getElementById('lista-padrao').innerHTML = "";
-        document.getElementById('lista-bonus').innerHTML  = "";
-        document.getElementById('lista-power').innerHTML  = "";
-        document.getElementById('lista-react').innerHTML  = "";
+        document.getElementById('lista-bonus').innerHTML = "";
+        document.getElementById('lista-power').innerHTML = "";
+        document.getElementById('lista-react').innerHTML = "";
 
-        if (acoes && acoes.length > 0) {
-            acoes.forEach(acao => {
+        if (acoes) {
+            Object.entries(acoes).forEach(([id, acao]) => {
                 const cardHTML = `
                     <div class="action-card type-${acao.tipo}">
                         <div>
@@ -26,11 +29,11 @@ export function carregarAcoes(uid) {
                         <div class="card-tags">
                             ${acao.tag ? `<span class="tag tag-damage">${acao.tag}</span>` : ''}
                         </div>
-                        <i class="fas fa-trash btn-delete" data-id="${acao.id}" style="position: absolute; top: 15px; right: 15px; color: #ddd; cursor: pointer;"></i>
+                        <i class="fas fa-trash btn-delete" data-id="${id}" style="position: absolute; top: 15px; right: 15px; color: #ddd; cursor: pointer;"></i>
                     </div>
                 `;
                 const container = document.getElementById(`lista-${acao.tipo}`);
-                if (container) container.innerHTML += cardHTML;
+                if(container) container.innerHTML += cardHTML;
             });
 
             document.querySelectorAll('.btn-delete').forEach(btn => {
@@ -42,56 +45,45 @@ export function carregarAcoes(uid) {
                         "Deletar",
                         "Cancelar"
                     );
-                    if (confirmado) {
-                        await apiDelete(`/users/${uid}/acoes/${idParaDeletar}`);
+                    if(confirmado) {
+                        remove(ref(db, 'users/' + uid + '/acoes/' + idParaDeletar));
                     }
                 });
             });
         }
-    }
+    });
 
-    // ─── Carga inicial ────────────────────────────────────────────────────────
-    carregarERenderizar();
-
-    // ─── Realtime: re-renderiza em qualquer mudança nas ações ─────────────────
-    supabase.channel(`acoes-${uid}`)
-        .on('postgres_changes', {
-            event: '*',
-            schema: 'public',
-            table: 'acoes',
-            filter: `personagem_id=eq.${uid}`
-        }, carregarERenderizar)
-        .subscribe();
-
-    // ─── NOVA AÇÃO ────────────────────────────────────────────────────────────
+    // NOVA AÇÃO
     const btnSalvarAcao = document.getElementById('btnSalvarAcao');
     const novoBtnSalvar = btnSalvarAcao.cloneNode(true);
     btnSalvarAcao.parentNode.replaceChild(novoBtnSalvar, btnSalvarAcao);
 
-    novoBtnSalvar.onclick = async () => {
+    novoBtnSalvar.onclick = () => {
         const nome = document.getElementById('newActionName').value;
         const desc = document.getElementById('newActionDesc').value;
         const tipo = document.getElementById('newActionType').value;
-        const tag  = document.getElementById('newActionTag').value;
+        const tag = document.getElementById('newActionTag').value;
 
-        if (nome) {
-            await apiPost(`/users/${uid}/acoes`, { nome, descricao: desc, tipo, tag });
+        if(nome) {
+            push(acoesRef, {
+                nome: nome, descricao: desc, tipo: tipo, tag: tag
+            });
             document.getElementById('newActionName').value = "";
             document.getElementById('newActionDesc').value = "";
-            document.getElementById('newActionTag').value  = "";
+            document.getElementById('newActionTag').value = "";
             document.getElementById('modalAcao').style.display = 'none';
         } else {
             notificar("Campo Obrigatório", "Dê um nome para sua ação!");
         }
     };
 
-    // ─── MODAIS ───────────────────────────────────────────────────────────────
-    const modal    = document.getElementById('modalAcao');
-    const btnNova  = document.getElementById('btnNovaAcao');
+    // MODAIS
+    const modal = document.getElementById('modalAcao');
+    const btnNova = document.getElementById('btnNovaAcao');
     const btnFechar = document.getElementById('btnFecharModal');
 
-    if (btnNova)   btnNova.onclick   = () => { modal.style.display = 'flex'; };
-    if (btnFechar) btnFechar.onclick = () => { modal.style.display = 'none'; };
+    if(btnNova) btnNova.onclick = () => { modal.style.display = 'flex'; };
+    if(btnFechar) btnFechar.onclick = () => { modal.style.display = 'none'; };
 }
 
 /**
