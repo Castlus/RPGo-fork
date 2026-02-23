@@ -96,17 +96,22 @@ if (btnCriar) {
 }
 
 // 7. Observador — redireciona após login/cadastro bem-sucedido
-supabase.auth.onAuthStateChange(async (_event, session) => {
-    if (session?.user) {
-        const user = session.user;
-        console.log('Usuário logado:', user.id);
+let redirecionando = false;
+supabase.auth.onAuthStateChange(async (event, session) => {
+    if (redirecionando) return;
+    if (event !== 'SIGNED_IN') return;
+    if (!session?.user) return;
 
-        try {
-            await apiGet(`/users/${user.id}`);
-            window.location.href = 'ficha.html';
-        } catch (e) {
-            // 404 → ainda não tem personagem
-            window.location.href = 'criacao-personagem.html';
-        }
+    redirecionando = true;
+    const user = session.user;
+
+    try {
+        await apiGet(`/users/${user.id}`);
+        window.location.href = 'ficha.html';
+    } catch (e) {
+        // 404 → ainda não tem personagem, qualquer outro erro tb manda criar
+        window.location.href = 'criacao-personagem.html';
+    } finally {
+        setLoading(false);
     }
 });
