@@ -73,16 +73,29 @@ Carrega e exibe o inventário do usuário em tempo real.
 - `uid` (string): ID do usuário no Firebase
 - `dbRefs` (Object): Objeto contendo funções e referências Firebase
 
-## Funcionalidades
+## Funcionalidades Principais
 
--  **Gerenciamento de Itens** - Criar, editar e deletar itens
--  **Sistema de Equipamento** - Equipar/desequipar armas e armaduras
--  **Slots de Equipamento** - Exibição de arma principal e armadura
--  **Sistema de Peso** - Controle de carga com feedback visual
--  **Aviso de Sobrecarga** - Indicador progressivo de peso
--  **Expandir/Recolher** - Cards de itens recolhíveis para melhor visualização
--  **Tipos de Item** - Suporte para Item Comum, Arma e Armadura
--  **Dados de Arma** - Dano e modificadores para armas
+- **Sistema de Favoritos**
+  - Permite marcar itens como "Destaque" clicando na estrela.
+  - Itens favoritos aparecem no topo da lista em uma seção dedicada.
+  - Recebem borda dourada e ícone de estrela preenchido.
+
+- **Categorização Automática**
+  - **Destaques**: Seção prioritária para itens favoritados.
+  - **Arsenal**: Agrupa automaticamente itens do tipo "Arma".
+  - **Armaria**: Agrupa itens do tipo "Armadura".
+  - **Mochila**: Contém itens comuns e outros objetos.
+
+- **Visualização Otimizada**
+  - **Cards Expansíveis**: Clique no card para expandir e ler descrições longas.
+  - **Ordenação**: Itens organizados alfabeticamente dentro de cada categoria.
+  - **Ocultação Inteligente**: Seções vazias são ocultadas automaticamente.
+
+- **Gerenciamento de Inventário**
+  - Criar, editar e excluir itens.
+  - Equipar/Desequipar armas e armaduras (com destaque visual).
+  - Sistema de peso e capacidade de carga com barra de progresso.
+  - Alertas visuais de sobrecarga.
 
 ## Estrutura de Dados do Item
 
