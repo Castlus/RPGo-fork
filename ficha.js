@@ -1,21 +1,20 @@
 import { supabase, apiGet, apiPatch } from './js/utils/api.js';
-import { iniciarBandejaDados } from "./js/components/dice tray/rolador.js";
+import { iniciarBandeja } from "./js/components/bandeja/bandeja.js";
 import { setupInventoryUI, carregarInventario } from "./js/components/inventory/inventario.js";
 import { carregarPerfil, configurarTema } from "./js/components/profile/perfil.js";
 import { carregarAcoes, setupTabsUI } from "./js/components/actions/acoes.js";
-import { iniciarChatTray } from "./js/components/chat/chat.js";
 
 // Força recarga quando a página é restaurada do bfcache (back/forward navigation)
 window.addEventListener('pageshow', (event) => {
     if (event.persisted) window.location.reload();
 });
 
-// Carrega o componente da bandeja de dados
+// Carrega o componente da bandeja (rolador + chat)
 async function carregarComponenteBandeja() {
-    const container = document.getElementById('diceTrayContainer');
+    const container = document.getElementById('bandejaContainer');
     if (container) {
         try {
-            const response = await fetch('./js/components/dice tray/rolador.html');
+            const response = await fetch('./js/components/bandeja/bandeja.html');
             const html = await response.text();
             container.innerHTML = html;
         } catch (error) {
@@ -66,20 +65,6 @@ async function carregarComponenteAcoes() {
     }
 }
 
-// Carrega o componente de Chat
-async function carregarComponenteChat() {
-    const container = document.getElementById('chatTrayContainer');
-    if (container) {
-        try {
-            const response = await fetch('./js/components/chat/chat.html');
-            const html = await response.text();
-            container.innerHTML = html;
-        } catch (error) {
-            console.error('Erro ao carregar componente de chat:', error);
-        }
-    }
-}
-
 // INICIALIZAÇÃO — usa getSession() para carga única, sem re-disparos
 (async () => {
     const { data: { session } } = await supabase.auth.getSession();
@@ -104,7 +89,6 @@ async function carregarComponenteChat() {
     await carregarComponentePerfil();
     await carregarComponenteAcoes();
     await carregarComponenteInventario();
-    await carregarComponenteChat();
 
     // Inicializa componentes
     carregarPerfil(user.id);
@@ -120,8 +104,7 @@ async function carregarComponenteChat() {
     configurarEdicao('maxPeso', 'cargaMaxima', 'null', user.id);
     configurarEdicao('valNivel', 'nivel', 'null', user.id);
 
-    iniciarBandejaDados(user);
-    iniciarChatTray(user);
+    iniciarBandeja(user);
 
     // Logout — botão carregado dinamicamente dentro do perfil.html
     const btnSair = document.getElementById('btnSair');

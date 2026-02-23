@@ -4,13 +4,11 @@
  * Delega a lógica de rolagem para rolador-logic.js
  * e a lógica de chat para chat-logic.js.
  *
- * @param {Object} user    - Objeto do usuário autenticado ({ uid, email })
- * @param {Object} dbRefs  - { db, ref, get, onValue, push, remove, update, query, orderByChild }
+ * @param {Object} user    - Objeto do usuário autenticado ({ id, email })
  */
 import { iniciarRolador } from './rolador-logic.js';
 import { iniciarChat }    from './chat-logic.js';
-export function iniciarBandeja(user, dbRefs) {
-    const { db, ref, get, onValue, push, remove, update, query, orderByChild } = dbRefs;
+export function iniciarBandeja(user) {
     const SESSION_ID = 'mesa-principal';
 
 
@@ -291,11 +289,8 @@ export function iniciarBandeja(user, dbRefs) {
     // =========================================================
     // INICIALIZAR SUBMÓDULOS
     // =========================================================
-    const chatApi = iniciarChat(user,
-        { db, ref, get, onValue, push, remove, query, orderByChild },
-        SESSION_ID
-    );
-    iniciarRolador(user, { db, ref, update }, {
+    const chatApi = iniciarChat(user, SESSION_ID);
+    iniciarRolador(user, {
         onRolar: (dados) => chatApi.enviarRolagem(dados)
     });
 }
