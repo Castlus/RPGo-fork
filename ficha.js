@@ -1,36 +1,25 @@
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { getDatabase, ref, get, onValue, push, remove, update, query, orderByChild } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
-import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-import { iniciarBandeja } from "./js/components/bandeja/bandeja.js";
+import { supabase, apiGet, apiPatch } from './js/utils/api.js';
+import { iniciarBandejaDados } from "./js/components/dice tray/rolador.js";
 import { setupInventoryUI, carregarInventario } from "./js/components/inventory/inventario.js";
 import { carregarPerfil, configurarTema } from "./js/components/profile/perfil.js";
 import { carregarAcoes, setupTabsUI } from "./js/components/actions/acoes.js";
+import { iniciarChatTray } from "./js/components/chat/chat.js";
 
-const firebaseConfig = {
-    apiKey: "AIzaSyBkp8ZUYMCfRokbpMl2fBGTvfMxzzvgaeY",
-    authDomain: "rpgo-onepiece.firebaseapp.com",
-    databaseURL: "https://rpgo-onepiece-default-rtdb.firebaseio.com",
-    projectId: "rpgo-onepiece",
-    storageBucket: "rpgo-onepiece.firebasestorage.app",
-    messagingSenderId: "726770644982",
-    appId: "1:726770644982:web:7c06f46940cc5142c3f9d7",
-    measurementId: "G-HSBMTMB5XK"
-};
+// Força recarga quando a página é restaurada do bfcache (back/forward navigation)
+window.addEventListener('pageshow', (event) => {
+    if (event.persisted) window.location.reload();
+});
 
-const app = initializeApp(firebaseConfig);
-const db = getDatabase(app);
-const auth = getAuth(app);
-
-// Carrega a bandeja unificada (Rolador + Chat)
+// Carrega o componente da bandeja de dados
 async function carregarComponenteBandeja() {
-    const container = document.getElementById('bandejaContainer');
+    const container = document.getElementById('diceTrayContainer');
     if (container) {
         try {
-            const response = await fetch('./js/components/bandeja/bandeja.html');
+            const response = await fetch('./js/components/dice tray/rolador.html');
             const html = await response.text();
             container.innerHTML = html;
         } catch (error) {
-            console.error('Erro ao carregar bandeja:', error);
+            console.error('Erro ao carregar componente da bandeja:', error);
         }
     }
 }
@@ -77,49 +66,77 @@ async function carregarComponenteAcoes() {
     }
 }
 
-
-
-// SEGURANÇA
-onAuthStateChanged(auth, async (user) => {
-    if (user) {
-        // Aguarda o carregamento dos componentes
-        await carregarComponenteBandeja();
-        await carregarComponentePerfil();
-        await carregarComponenteAcoes();
-        await carregarComponenteInventario();
-        
-        // Passa os refs do Firebase para os componentes
-        const dbRefs = { db, ref, get, onValue, push, remove, update, query, orderByChild };
-        
-        // Inicializa componentes
-        carregarPerfil(user.uid, dbRefs);
-        configurarTema();
-        carregarAcoes(user.uid, dbRefs);
-        setupTabsUI();
-        
-        setupInventoryUI(user.uid, dbRefs);
-        carregarInventario(user.uid, dbRefs);
-
-        configurarEdicao('valHp', 'hpAtual', 'maxHp', user.uid);
-        configurarEdicao('valPp', 'ppAtual', 'maxPp', user.uid);
-        configurarEdicao('maxPeso', 'cargaMaxima', 'null', user.uid);
-        configurarEdicao('valNivel', 'nivel', 'null', user.uid);
-        
-        // Inicializa a bandeja unificada (Rolador + Chat)
-        iniciarBandeja(user, dbRefs);
-
-        // Logout — configurado aqui pois o botão está dentro do perfil.html,
-        // que é carregado dinamicamente. DOMContentLoaded já foi disparado antes disso.
-        const btnSair = document.getElementById('btnSair');
-        if (btnSair) {
-            btnSair.addEventListener('click', () => {
-                signOut(auth).then(() => { window.location.href = 'index.html'; });
-            });
+// Carrega o componente de Chat
+async function carregarComponenteChat() {
+    const container = document.getElementById('chatTrayContainer');
+    if (container) {
+        try {
+            const response = await fetch('./js/components/chat/chat.html');
+            const html = await response.text();
+            container.innerHTML = html;
+        } catch (error) {
+            console.error('Erro ao carregar componente de chat:', error);
         }
-    } else {
-        window.location.href = "index.html";
     }
-});
+}
+
+// INICIALIZAÇÃO — usa getSession() para carga única, sem re-disparos
+(async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+
+    if (!session?.user) {
+        window.location.href = 'index.html';
+        return;
+    }
+
+    const user = session.user;
+
+    // Verifica se o personagem existe; se não, redireciona para criação
+    try {
+        await apiGet(`/users/${user.id}`);
+    } catch (e) {
+        window.location.href = 'criacao-personagem.html';
+        return;
+    }
+
+    // Aguarda o carregamento dos componentes HTML
+    await carregarComponenteBandeja();
+    await carregarComponentePerfil();
+    await carregarComponenteAcoes();
+    await carregarComponenteInventario();
+    await carregarComponenteChat();
+
+    // Inicializa componentes
+    carregarPerfil(user.id);
+    configurarTema();
+    carregarAcoes(user.id);
+    setupTabsUI();
+
+    setupInventoryUI(user.id);
+    carregarInventario(user.id);
+
+    configurarEdicao('valHp', 'hpAtual', 'maxHp', user.id);
+    configurarEdicao('valPp', 'ppAtual', 'maxPp', user.id);
+    configurarEdicao('maxPeso', 'cargaMaxima', 'null', user.id);
+    configurarEdicao('valNivel', 'nivel', 'null', user.id);
+
+    iniciarBandejaDados(user);
+    iniciarChatTray(user);
+
+    // Logout — botão carregado dinamicamente dentro do perfil.html
+    const btnSair = document.getElementById('btnSair');
+    if (btnSair) {
+        btnSair.addEventListener('click', async () => {
+            await supabase.auth.signOut();
+            window.location.href = 'index.html';
+        });
+    }
+
+    // Redireciona ao fazer logout em outra aba
+    supabase.auth.onAuthStateChange((_event, s) => {
+        if (!s) window.location.href = 'index.html';
+    });
+})();
 
 // EDIÇÃO OTIMISTA
 function configurarEdicao(elementoId, campoBanco, elementoMaxId, uid) {
@@ -154,14 +171,12 @@ function configurarEdicao(elementoId, campoBanco, elementoMaxId, uid) {
             spanValor.innerText = novoValor;
             if (input.parentNode) input.parentNode.replaceChild(spanValor, input);
 
-            update(ref(db, 'users/' + uid), { [campoBanco]: novoValor });
+            apiPatch(`/users/${uid}`, { [campoBanco]: novoValor });
         };
         input.addEventListener('keydown', (e) => { if (e.key === 'Enter') { salvar(); input.blur(); } });
         input.addEventListener('blur', salvar, { once: true });
     });
 }
-
-// (logout configurado dinamicamente dentro de onAuthStateChanged, após carga do perfil)
 
 // =========================================================
 // FIM DO ARQUIVO
