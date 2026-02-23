@@ -1,5 +1,5 @@
 // 1. Imports
-import { supabase, apiGet } from './utils/api.js';
+import { supabase } from './utils/api.js';
 
 // 3. Elementos da Tela
 const emailInput = document.getElementById('email');
@@ -97,21 +97,12 @@ if (btnCriar) {
 
 // 7. Observador — redireciona após login/cadastro bem-sucedido
 let redirecionando = false;
-supabase.auth.onAuthStateChange(async (event, session) => {
+supabase.auth.onAuthStateChange((event, session) => {
     if (redirecionando) return;
     if (event !== 'SIGNED_IN') return;
     if (!session?.user) return;
 
     redirecionando = true;
-    const user = session.user;
-
-    try {
-        await apiGet(`/users/${user.id}`);
-        window.location.href = 'ficha.html';
-    } catch (e) {
-        // 404 → ainda não tem personagem, qualquer outro erro tb manda criar
-        window.location.href = 'criacao-personagem.html';
-    } finally {
-        setLoading(false);
-    }
+    setLoading(false);
+    window.location.href = 'ficha.html';
 });

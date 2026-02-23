@@ -1,4 +1,4 @@
-import { supabase, apiPatch } from './js/utils/api.js';
+import { supabase, apiGet, apiPatch } from './js/utils/api.js';
 import { iniciarBandejaDados } from "./js/components/dice tray/rolador.js";
 import { setupInventoryUI, carregarInventario } from "./js/components/inventory/inventario.js";
 import { carregarPerfil, configurarTema } from "./js/components/profile/perfil.js";
@@ -90,6 +90,14 @@ async function carregarComponenteChat() {
     }
 
     const user = session.user;
+
+    // Verifica se o personagem existe; se não, redireciona para criação
+    try {
+        await apiGet(`/users/${user.id}`);
+    } catch (e) {
+        window.location.href = 'criacao-personagem.html';
+        return;
+    }
 
     // Aguarda o carregamento dos componentes HTML
     await carregarComponenteBandeja();
