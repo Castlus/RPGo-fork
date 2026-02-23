@@ -1,13 +1,13 @@
 # Componente Chat Tray
 
 ## 📋 Descrição
-O componente **Chat Tray** é uma bandeja de chat deslizável, flutuante e totalmente funcional com integração Firebase. Oferece:
+O componente **Chat Tray** é uma bandeja de chat deslizável e flutuante com integração Firebase. Oferece:
 - ✅ **Movimentação livre** com snap automático às bordas
 - ✅ **Detecção de colisão** que impede sobreposição com o Dice Tray
-- ✅ **Sistema de mensagens em tempo real** com Firebase Realtime Database
-- ✅ **Armazenamento persistente** de mensagens por usuário
-- ✅ **Timestamps e controle de usuário** em cada mensagem
-- ✅ **Toggle** (abrir/fechar) com transições suaves
+- ✅ **Chat compartilhado** — todos os jogadores leem e escrevem no mesmo nó do Firebase
+- ✅ **Listener único com unsubscribe** — sem duplicação de mensagens ao reabrir
+- ✅ **Mensagens ordenadas** por timestamp via `orderByChild()`
+- ✅ **Toggle** (abrir/fechar) com validação anti-conflito de drag vs. click
 
 ## 📁 Estrutura de Arquivos
 - `chat.html` - Template HTML com estrutura da bandeja
@@ -107,7 +107,10 @@ Inicializa a bandeja de chat com todas as funcionalidades.
 
 ### Armazenamento de Dados (Firebase)
 
-**Localização**: `chats/{userId}/mensagens/{messageId}`
+**Localização**: `sessions/mesa-principal/mensagens/{messageId}`
+
+> 💡 **SESSION_ID** (`'mesa-principal'`) está definido como constante no topo de `chat.js`.  
+> Para suportar múltiplas mesas no futuro, basta tornar esse valor dinâmico (ex: vindo de um seletor ou URL).
 
 **Estrutura de cada mensagem**:
 ```json
@@ -120,11 +123,11 @@ Inicializa a bandeja de chat com todas as funcionalidades.
 ```
 
 **Características**:
-- ✅ Cada usuário tem seu próprio nó de chat
-- ✅ Mensagens armazenadas como lista com IDs únicos (auto-gerados por `push()`)
-- ✅ Timestamps em formato ISO para ordenação
-- ✅ Campo `uid` para identificar autor
-- ✅ Campo `nome` para exibição legível
+- ✅ Todos os jogadores escrevem e leem no **mesmo nó** — chat é compartilhado
+- ✅ Mensagens armazenadas com IDs únicos (auto-gerados por `push()`)
+- ✅ Timestamps em formato ISO, **ordenadas por `orderByChild('timestamp')`**
+- ✅ Campo `uid` identifica o autor da mensagem
+- ✅ Campo `nome` para exibição legível no chat
 
 ---
 
@@ -227,23 +230,21 @@ return overlap;
 
 **Comportamento**:
 ```javascript
+// Só ativa toggle em cliques rápidos sem movimento (mesmo padrão do Dice Tray)
+const clickDuration = Date.now() - dragStartTime;
+if (hasMoved || clickDuration >= 200) return; // foi drag, não click
+
 // Se FECHADO (collapsed)
 click → Remove classe 'collapsed'
      → Mostra body (display: flex)
-     → Muda ícone para chevron-up
-     → Carrega mensagens do Firebase
+     → Cancela listener anterior (unsubscribe)
+     → Registra novo listener e carrega mensagens
 
 // Se ABERTO
 click → Adiciona classe 'collapsed'
      → Oculta body (display: none)
-     → Muda ícone para chevron-down
+     // Listener permanece — será cancelado no próximo open
 ```
-
-**Validações para evitar conflitos**:
-- Se `isDragging = true`, não ativa toggle
-- Se `hasMoved = true`, não ativa toggle
-- Se clicou em closeBtn, sempre executa toggle
-- Delay de 50ms antes de resetar `hasMoved`
 
 ---
 
@@ -311,7 +312,7 @@ Envia uma mensagem para Firebase.
 1. Obtém texto do input: chatInput.value.trim()
 2. Valida se não está vazio
 3. Cria timestamp: new Date().toISOString()
-4. Constrói referência: ref(db, `chats/${user.uid}/mensagens`)
+4. Constrói referência: ref(db, `sessions/${SESSION_ID}/mensagens`)
 5. Push para Firebase com dados:
    {
      uid: user.uid,
@@ -342,9 +343,10 @@ Carrega e exibe mensagens em tempo real do Firebase.
 
 **Fluxo**:
 ```javascript
-1. Cria referência: ref(db, `chats/${user.uid}/mensagens`)
-2. Configura listener com onValue()
-3. Quando snapshot recebido:
+1. Cancela listener anterior (unsubscribeMensagens), se houver
+2. Cria query ordenada: query(ref(db, `sessions/${SESSION_ID}/mensagens`), orderByChild('timestamp'))
+3. Configura listener com onValue() — guarda retorno em unsubscribeMensagens
+4. Quando snapshot recebido:
    a. Valida se tem dados
    b. Se vazio: mostra "Nenhuma mensagem ainda..."
    c. Se tem dados: 
@@ -390,7 +392,7 @@ if (mensagem.toLowerCase() === '/limpar') {
 3. **Não envia mensagem** (não aparece no chat)
 4. Exibe `confirm()`: "Tem certeza que deseja apagar TODAS as mensagens?"
 5. Se clica "OK":
-   - Executa `remove(ref(db, 'chats/{uid}/mensagens'))`
+   - Executa `remove(ref(db, 'sessions/mesa-principal/mensagens'))`
    - Deleta a pasta inteira de mensagens do Firebase
    - Exibe: "✓ Histórico de mensagens apagado com sucesso"
    - Chat fica vazio imediatamente
@@ -454,62 +456,56 @@ const nomeExibido = isSent ? 'Você' : msg.nome;
 ```javascript
 import { iniciarChatTray } from './js/components/chat/chat.js';
 import { 
-  ref, onValue, push, update, remove 
-} from 'https://www.gstatic.com/firebaselibs/9.22.0/firebase-database.js';
-import { getDatabase } from 'https://www.gstatic.com/firebaselibs/9.22.0/firebase-database.js';
-import { db } from './js/utils/firebase-config.js'; // Sua instância do Firebase
+  getDatabase, ref, onValue, push, update, remove, query, orderByChild
+} from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js';
 
-// No onAuthStateChanged
-firebase.auth().onAuthStateChanged(async (user) => {
+const db = getDatabase(app);
+
+// IMPORTANTE: query e orderByChild são necessários para ordenação de mensagens
+const dbRefs = { db, ref, onValue, push, update, remove, query, orderByChild };
+
+onAuthStateChanged(auth, async (user) => {
   if (user) {
-    // Prepare dbRefs object
-    const dbRefs = {
-      db: db,
-      ref: ref,
-      onValue: onValue,
-      push: push,
-      update: update,
-      remove: remove
-    };
-    
-    // Inicializa chat
+    await carregarComponenteChat(); // injeta o HTML ANTES de chamar a função
     iniciarChatTray(user, dbRefs);
   }
 });
 ```
 
+> ⚠️ O HTML do chat **deve ser injetado antes** de `iniciarChatTray()` ser chamado.
+> O componente configura os listeners diretamente, sem retry por `setInterval`.
+
 ### Estrutura no Firebase Console
 
 **Caminhos de dados**:
 ```
-chats/
-  ├── userId123/
-  │   ├── mensagens/
-  │   │   ├── -N123abc... (auto-ID do push)
-  │   │   │   ├── uid: "userId123"
-  │   │   │   ├── nome: "João Silva"
-  │   │   │   ├── mensagem: "Olá!"
-  │   │   │   └── timestamp: "2026-01-16T14:30:45.123Z"
-  │   │   └── -N123abd...
-  │   │       └── ...
-  │   └── (futuro: configs, notificações, etc)
-  └── userId456/
-      └── ...
+sessions/
+  └── mesa-principal/
+      └── mensagens/
+          ├── -N123abc... (auto-ID do push)
+          │   ├── uid: "userId123"
+          │   ├── nome: "João Silva"
+          │   ├── mensagem: "Olá!"
+          │   └── timestamp: "2026-01-16T14:30:45.123Z"
+          └── -N123abd...
+              └── ...
 ```
+
+> Todos os jogadores leem e escrevem em `sessions/mesa-principal/mensagens`.
+> O `uid` dentro de cada mensagem identifica quem a enviou.
 
 ### Regras de Segurança Recomendadas
 
 ```json
 {
   "rules": {
-    "chats": {
-      "$uid": {
+    "sessions": {
+      "mesa-principal": {
         "mensagens": {
-          ".read": "auth.uid === $uid || auth.uid === 'admin'",
-          ".write": "auth.uid === $uid",
-          ".validate": "newData.hasChildren(['uid', 'nome', 'mensagem', 'timestamp'])",
+          ".read": "auth != null",
+          ".write": "auth != null",
           "$messageId": {
-            ".validate": "newData.child('uid').val() === auth.uid"
+            ".validate": "newData.hasChildren(['uid', 'nome', 'mensagem', 'timestamp']) && newData.child('uid').val() === auth.uid"
           }
         }
       }
@@ -731,14 +727,14 @@ chatTray.style.transition = 'none';
 chatTray.style.transition = 'all 0.3s cubic-bezier(...)';
 ```
 
-**3. Retry com Limite**
+**3. Listener Único com Unsubscribe**
 ```javascript
-let tentativas = 0;
-if (tentativas > 50) {
-    clearInterval(setupChatListeners);
-    console.error('Chat elements não encontrados');
-}
-// 50 tentativas × 100ms = 5 segundos máximo
+// O unsubscribe do listener é armazenado e cancelado antes de registrar um novo.
+// Isso evita múltiplos listeners ativos (que causariam renderização duplicada de mensagens).
+let unsubscribeMensagens = null;
+// ... ao abrir:
+if (unsubscribeMensagens) unsubscribeMensagens();
+unsubscribeMensagens = onValue(mensagensQuery, callback);
 ```
 
 **4. Validação Eficiente de Colisão**
@@ -795,16 +791,26 @@ const setupRetryMax = 50;         // Máximo de retries
 ### No Firebase
 
 ```javascript
-// Referência padrão
-`chats/${user.uid}/mensagens`
+// SESSION_ID compartilhado entre todos os jogadores
+const SESSION_ID = 'mesa-principal'; // definido no topo de iniciarChatTray()
 
-// Estrutura de dados
+// Referência das mensagens
+`sessions/${SESSION_ID}/mensagens`
+
+// Consulta ordenada por data (usada em carregarMensagens)
+query(ref(db, `sessions/${SESSION_ID}/mensagens`), orderByChild('timestamp'))
+
+// Estrutura de dados de cada mensagem
 {
-    uid: user.uid,
+    uid: user.uid,               // identifica o autor
     nome: user.displayName || user.email || 'Anônimo',
-    mensagem: string,
-    timestamp: ISO string
+    mensagem: string,            // texto da mensagem
+    timestamp: ISO string        // usado para ordenação
 }
+
+// Constantes de movimento
+const snapThreshold = 80;  // distância para snap (px)
+const safeMargin = 20;     // margem mínima na tela (px)
 ```
 
 ---
@@ -829,7 +835,7 @@ Configura listeners:
 Aguarda clique do usuário
 ```
 
-### 2️⃣ Envio de Mensagem
+### 2⃣ Envio de Mensagem
 ```
 Usuário digita + clica botão / pressiona Enter
     ↓
@@ -839,32 +845,37 @@ Cria timestamp ISO atual
     ↓
 Monta objeto com uid, nome, mensagem, timestamp
     ↓
-push(ref(db, 'chats/{uid}/mensagens'), objeto)
+push(ref(db, 'sessions/mesa-principal/mensagens'), objeto)
     ↓
 Firebase armazena com ID único auto-gerado
     ↓
 Listener onValue() é disparado
     ↓
-carregarMensagens() renderiza nova mensagem
+carregarMensagens() renderiza nova mensagem (já em ordem)
     ↓
-Auto-scroll para último
+Auto-scroll para última
     ↓
 Input limpo + foco restaurado
 ```
 
-### 3️⃣ Carregamento de Mensagens
+### 3⃣ Carregamento de Mensagens
 ```
 Chat aberto (clique no header)
     ↓
 carregarMensagens() chamado
     ↓
-Configura listener: onValue(ref(db, 'chats/{uid}/mensagens'))
+Cancela listener anterior (unsubscribeMensagens)
+    ↓
+Cria query ordenada por timestamp:
+  query(ref(db, 'sessions/mesa-principal/mensagens'), orderByChild('timestamp'))
+    ↓
+Registra novo onValue() → guarda unsubscribe
     ↓
 Snapshot recebido:
   - Se vazio: mostra "Nenhuma mensagem ainda..."
-  - Se tem dados: itera, formata, renderiza
+  - Se tem dados: itera em ordem cronológica, formata, renderiza
     ↓
-Cada mensagem:
+Each mensagem:
   - Formata timestamp em hora local PT-BR
   - Determina se é do usuário (isSent = uid === user.uid)
   - Renderiza com nome exibido ("Você" ou nome real)
@@ -996,7 +1007,7 @@ if (detectarColisao(newLeft, newTop, currentWidth, currentHeight)) {
 
 ```javascript
 function verificarPrimeiraVez() {
-    const messagesRef = ref(db, `chats/${user.uid}/mensagens`);
+    const messagesRef = ref(db, `sessions/${SESSION_ID}/mensagens`);
     
     onValue(messagesRef, (snapshot) => {
         if (!snapshot.exists()) {
@@ -1157,30 +1168,27 @@ if (mensagem.length > 1000) {
 
 ---
 
-## 🚀 Futuras Melhorias Sugeridas
+## 🚀 Futuras Melhorias (Pacote B e além)
 
-1. **Multi-usuários**: Permitir chat com múltiplos usuários (não apenas histórico pessoal)
-2. **Notificações**: Badge com contador de mensagens não lidas
-3. **Busca**: Filtro/busca por conteúdo de mensagens
-4. **Emojis**: Suporte a emojis e formatação de texto
-5. **Arquivos**: Upload de imagens/anexos
-6. **Reações**: Reações a mensagens específicas
-7. **Tipagem**: Indicador "está digitando..."
-8. **Bots**: Mensagens automáticas do sistema
-9. **Salas**: Múltiplas salas de chat
-10. **Criptografia**: End-to-end encryption
+1. **Animação de open/close** — igualar ao Dice Tray (expansão animada com measuring de altura)
+2. **Integração Dice Tray → Chat** — ao rolar dados, fazer `push` para o chat com `tipo: 'rolagem'`
+3. **Badge de não lidos** — contador visual no header quando o chat está minimizado
+4. **Sanitização XSS** — usar `textContent` ou DOMPurify para evitar injeção de HTML via mensagens
+5. **Múltiplas mesas** — tornar `SESSION_ID` dinâmico (vindo de seletor ou URL)
+6. **Suporte touch** — adicionar `touchstart/touchmove/touchend` ao drag-and-drop
+7. **Limite de histórico** — usar `limitToLast(200)` na query para não carregar todo o histórico
 
 ---
 
 ## Troubleshooting
 
-| Problema | Causa | Solução |
-|----------|-------|---------|
-| Chat não aparece | HTML não carregou | Verificar fetch em `carregarComponenteChat()` |
-| Colisão não funciona | Dice Tray oculto | Verificar `display: none` do diceTray |
-| Movimento travado | Event listener bloqueado | Verificar `isDragging` flag |
-| Snap não funciona | Threshold muito alto | Reduzir `snapThreshold` de 80px |
-| Z-index errado | Conflito com outro modal | Aumentar z-index de 1000 para 8999 |
+| Problema             | Causa                    | Solução |
+|----------            |-------                   |---------                                      |
+| Chat não aparece     | HTML não carregou        | Verificar fetch em `carregarComponenteChat()` |
+| Colisão não funciona | Dice Tray oculto         | Verificar `display: none` do diceTray         |
+| Movimento travado    | Event listener bloqueado | Verificar `isDragging` flag                   |
+| Snap não funciona    | Threshold muito alto     | Reduzir `snapThreshold` de 80px               |
+| Z-index errado       | Conflito com outro modal | Aumentar z-index de 1000 para 8999            |
 
 ---
 

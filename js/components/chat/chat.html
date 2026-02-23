@@ -1,30 +1,28 @@
-<div id="chatTray" class="chat-tray dock-bottom collapsed">
+<div id="chatTray" class="chat-tray">
+
     <div id="chatTrayHeader" class="chat-header">
-        <div style="display: flex; align-items: center; gap: 10px; flex: 1;">
-            <i class="fas fa-comment" style="font-size: 1.2rem; transition: 0.3s; margin: 0;"></i>
-            <span style="font-weight: bold;">Chat</span>
+        <div class="header-left">
+            <i class="fas fa-comment"></i>
+            <span class="chat-label">Chat</span>
         </div>
-        <i class="fas fa-chevron-down" id="closeChatTray" style="cursor: pointer; font-size: 1.2rem; color: #fff; transition: 0.2s;"></i>
+        <i id="chatIcon" class="fas fa-chevron-up"></i>
     </div>
 
-    <div id="chatTrayBody" class="chat-body" style="display: none;">
+    <div id="chatTrayBody" class="chat-body">
         <div id="chatMessages" class="chat-messages">
             <p style="color: #999; text-align: center; font-size: 0.9rem;">Nenhuma mensagem ainda...</p>
         </div>
 
-        <div style="display: flex; gap: 8px; padding: 10px 0;">
-            <input 
-                type="text" 
-                id="chatInput" 
-                placeholder="Digite uma mensagem..." 
-                style="flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 0.9rem;"
+        <div class="chat-input-row">
+            <input
+                type="text"
+                id="chatInput"
+                placeholder="Digite uma mensagem..."
             />
-            <button 
-                id="sendChatBtn" 
-                style="background: var(--primary); color: white; border: none; padding: 10px 15px; border-radius: 6px; cursor: pointer; font-weight: bold;"
-            >
+            <button id="sendChatBtn" title="Enviar">
                 <i class="fas fa-paper-plane"></i>
             </button>
         </div>
     </div>
+
 </div>
