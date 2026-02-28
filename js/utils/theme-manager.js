@@ -19,6 +19,9 @@ export const TEMAS_PRESET = [
             '--border':     '#e0e0e0',
             '--bg-button':  '#eeeeee',
             '--text-button':'#000000',
+            '--bg-sidebar':        '#ffffff',
+            '--sidebar-text-main': '#2c3e50',
+            '--sidebar-text-sec':  '#7f8c8d',
         }
     },
     {
@@ -36,6 +39,9 @@ export const TEMAS_PRESET = [
             '--border':     '#444444',
             '--bg-button':  '#333333',
             '--text-button':'#e0e0e0',
+            '--bg-sidebar':        '#1e1e1e',
+            '--sidebar-text-main': '#e0e0e0',
+            '--sidebar-text-sec':  '#a0a0a0',
         }
     },
     {
@@ -53,6 +59,9 @@ export const TEMAS_PRESET = [
             '--border':     '#bae6fd',
             '--bg-button':  '#e0f2fe',
             '--text-button':'#03045e',
+            '--bg-sidebar':        '#ffffff',
+            '--sidebar-text-main': '#03045e',
+            '--sidebar-text-sec':  '#4a90a4',
         }
     },
     {
@@ -70,6 +79,9 @@ export const TEMAS_PRESET = [
             '--border':     '#333355',
             '--bg-button':  '#1e1e35',
             '--text-button':'#e8e8ff',
+            '--bg-sidebar':        '#16162a',
+            '--sidebar-text-main': '#e8e8ff',
+            '--sidebar-text-sec':  '#8888bb',
         }
     },
     {
@@ -87,6 +99,9 @@ export const TEMAS_PRESET = [
             '--border':     '#4a3020',
             '--bg-button':  '#2e2015',
             '--text-button':'#e8d5a3',
+            '--bg-sidebar':        '#231810',
+            '--sidebar-text-main': '#e8d5a3',
+            '--sidebar-text-sec':  '#a08060',
         }
     },
     {
@@ -104,6 +119,9 @@ export const TEMAS_PRESET = [
             '--border':     '#b7e4c7',
             '--bg-button':  '#e8f5e9',
             '--text-button':'#1b4332',
+            '--bg-sidebar':        '#ffffff',
+            '--sidebar-text-main': '#1b4332',
+            '--sidebar-text-sec':  '#52796f',
         }
     }
 ];

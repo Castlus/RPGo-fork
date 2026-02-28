@@ -1,4 +1,14 @@
-# Componente Dice Tray (Bandeja de Dados)
+# ⚠️ DOCUMENTAÇÃO DEPRECIADA
+
+Este componente (`dice tray/rolador.js`) foi **substituído** pela bandeja unificada em `js/components/bandeja/`.
+
+**Documentação atual:** [`js/components/bandeja/bandeja-DOC.md`](../bandeja/bandeja-DOC.md)
+
+---
+
+*(Conteúdo abaixo é histórico e não reflete o código atual)*
+
+# Componente Dice Tray (Bandeja de Dados) — DEPRECIADO
 
 ## Estrutura
 

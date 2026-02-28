@@ -9,6 +9,13 @@
     --text-sec:   #7f8c8d;
     --border:     #e0e0e0;
 
+    /* Sidebar — independentes do conteúdo principal.
+       Por padrão iguais aos globais; mude só neles para
+       ter sidebar escura com página clara (ou vice-versa). */
+    --bg-sidebar:         var(--bg-card);
+    --sidebar-text-main:  var(--text-main);
+    --sidebar-text-sec:   var(--text-sec);
+
     /* Cores das Ações */
     --color-padrao: #3498db; /* Azul */
     --color-bonus:  #f1c40f; /* Amarelo */
@@ -72,7 +79,7 @@ body {
 
 /* --- SIDEBAR --- */
 .sidebar {
-    background: var(--bg-card);
+    background: var(--bg-sidebar);
     border-radius: 16px;
     padding: 25px;
     box-shadow: 0 4px 12px rgba(0,0,0,0.05);
@@ -81,6 +88,9 @@ body {
     gap: 20px;
     height: 100%;
     overflow-y: auto;
+    /* Herança: todo texto sem cor explícita dentro da sidebar
+       usa o token correto para o fundo da sidebar. */
+    color: var(--sidebar-text-main);
 }
 
 .profile-header { text-align: center; }
@@ -93,8 +103,8 @@ body {
 }
 .avatar-circle img { width: 100%; height: 100%; object-fit: cover; }
 
-.char-name { font-size: 1.4rem; font-weight: 700; color: var(--text-main); }
-.char-level { font-size: 0.9rem; color: var(--text-sec); }
+.char-name { font-size: 1.4rem; font-weight: 700; color: var(--sidebar-text-main); }
+.char-level { font-size: 0.9rem; color: var(--sidebar-text-sec); }
 
 /* Barras de Status */
 .bar-group { margin-bottom: 10px; }
@@ -125,7 +135,7 @@ body {
     padding: 10px;
     text-align: center;
 }
-.attr-label { font-size: 0.7rem; color: var(--text-sec); text-transform: uppercase; letter-spacing: 1px; }
+.attr-label { font-size: 0.7rem; color: var(--sidebar-text-sec); text-transform: uppercase; letter-spacing: 1px; }
 .attr-value { font-size: 1.5rem; font-weight: 700; color: var(--primary); }
 
 /* --- CONTEÚDO PRINCIPAL --- */
