@@ -6,7 +6,8 @@ import { supabase } from './supabase-config.js';
 
 export { supabase };
 
-export const API_BASE = '/api';
+const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+export const API_BASE = isLocal ? '/api' : 'https://rpgo-backend.fly.dev/api';
 
 async function authHeaders() {
     const { data: { session } } = await supabase.auth.getSession();
