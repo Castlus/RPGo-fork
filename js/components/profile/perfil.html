@@ -1,6 +1,6 @@
 <aside class="sidebar" style="position: relative;">
     <div style="position: absolute; top: 20px; right: 20px; display: flex; gap: 10px;">
-        <i id="btnToggleTheme" class="fas fa-moon" 
+        <i id="btnPaleta" class="fas fa-palette"
            style="color: #aaa; cursor: pointer; font-size: 1.2rem; transition: 0.3s;">
         </i>
         <i id="btnEditarFicha" class="fas fa-cog" 
@@ -9,7 +9,7 @@
     </div>
     <style> 
         #btnEditarFicha:hover { color: var(--primary) !important; transform: rotate(90deg); } 
-        #btnToggleTheme:hover { color: var(--color-bonus) !important; transform: scale(1.1); }
+        #btnPaleta:hover { color: var(--primary) !important; transform: scale(1.1); }
     </style>
 
     <div class="profile-header">
@@ -55,8 +55,75 @@
         <div class="attr-card"><div class="attr-label">PRE</div><div class="attr-value" id="attr-presenca">0</div></div>
     </div>
     
-    <button id="btnSair" style="margin-top: auto; padding: 10px; border:none; background: #eee; cursor: pointer; border-radius: 6px;">Sair</button>
+    <button id="btnSair" style="margin-top: auto; padding: 10px; border:none; background: var(--bg-button); color: var(--text-button); cursor: pointer; border-radius: 6px;">Sair</button>
 </aside>
+
+<!-- Modal: Temas -->
+<div id="modalTemas" class="modal-overlay" style="display: none;">
+    <div class="modal-box" style="max-width: 500px;">
+        <h2 style="margin-bottom: 4px;">&#127912; Temas</h2>
+        <p style="font-size: 0.82rem; color: var(--text-sec); margin-bottom: 18px;">Escolha um tema ou crie o seu próprio.</p>
+
+        <!-- Chips de tema (gerados por JS) -->
+        <div id="temaChips" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 20px;"></div>
+
+        <!-- Personalizador -->
+        <details id="temaDetails">
+            <summary style="cursor: pointer; font-weight: 600; font-size: 0.9rem; color: var(--text-sec); padding: 8px 0; list-style: none; display: flex; align-items: center; gap: 6px;">
+                <i class="fas fa-pen"></i> Criar tema personalizado
+            </summary>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 14px;">
+                <div>
+                    <label style="font-size: 0.75rem; font-weight: 600; color: var(--text-sec); display: block; margin-bottom: 4px;">Destaque</label>
+                    <input type="color" id="cpPrimary" style="width: 100%; height: 36px; border-radius: 6px; border: 1px solid var(--border); cursor: pointer; padding: 2px;">
+                </div>
+                <div>
+                    <label style="font-size: 0.75rem; font-weight: 600; color: var(--text-sec); display: block; margin-bottom: 4px;">Fundo da Página</label>
+                    <input type="color" id="cpBgPage" style="width: 100%; height: 36px; border-radius: 6px; border: 1px solid var(--border); cursor: pointer; padding: 2px;">
+                </div>
+                <div>
+                    <label style="font-size: 0.75rem; font-weight: 600; color: var(--text-sec); display: block; margin-bottom: 4px;">Fundo dos Cards</label>
+                    <input type="color" id="cpBgCard" style="width: 100%; height: 36px; border-radius: 6px; border: 1px solid var(--border); cursor: pointer; padding: 2px;">
+                </div>
+                <div>
+                    <label style="font-size: 0.75rem; font-weight: 600; color: var(--text-sec); display: block; margin-bottom: 4px;">Superfície</label>
+                    <input type="color" id="cpBgSurface" style="width: 100%; height: 36px; border-radius: 6px; border: 1px solid var(--border); cursor: pointer; padding: 2px;">
+                </div>
+                <div>
+                    <label style="font-size: 0.75rem; font-weight: 600; color: var(--text-sec); display: block; margin-bottom: 4px;">Texto Principal</label>
+                    <input type="color" id="cpTextMain" style="width: 100%; height: 36px; border-radius: 6px; border: 1px solid var(--border); cursor: pointer; padding: 2px;">
+                </div>
+                <div>
+                    <label style="font-size: 0.75rem; font-weight: 600; color: var(--text-sec); display: block; margin-bottom: 4px;">Texto Secundário</label>
+                    <input type="color" id="cpTextSec" style="width: 100%; height: 36px; border-radius: 6px; border: 1px solid var(--border); cursor: pointer; padding: 2px;">
+                </div>
+                <div style="grid-column: 1 / -1;">
+                    <label style="font-size: 0.75rem; font-weight: 600; color: var(--text-sec); display: block; margin-bottom: 4px;">Bordas</label>
+                    <input type="color" id="cpBorder" style="width: 100%; height: 36px; border-radius: 6px; border: 1px solid var(--border); cursor: pointer; padding: 2px;">
+                </div>
+                <div style="grid-column: 1 / -1;">
+                    <label style="font-size: 0.75rem; font-weight: 600; color: var(--text-sec); display: block; margin-bottom: 4px;">Nome do tema</label>
+                    <input type="text" id="cpNome" placeholder="Ex: Meu Tema Roxo" maxlength="24"
+                        style="width: 100%; padding: 8px 10px; border-radius: 6px; border: 1px solid var(--border);
+                               background: var(--bg-surface); color: var(--text-main); font-size: 0.9rem;">
+                </div>
+            </div>
+            <button id="btnSalvarCustom"
+                style="margin-top: 14px; width: 100%; background: var(--primary); color: white;
+                       border: none; padding: 10px; border-radius: 8px; font-weight: 700; cursor: pointer;">
+                <i class="fas fa-save"></i> Salvar como Tema
+            </button>
+        </details>
+
+        <div style="margin-top: 20px; text-align: right;">
+            <button id="btnFecharTemas"
+                style="background: var(--bg-surface); color: var(--text-main); border: none;
+                       padding: 10px 20px; border-radius: 8px; font-weight: bold; cursor: pointer;">
+                Fechar
+            </button>
+        </div>
+    </div>
+</div>
 
 <div id="modalFicha" class="modal-overlay" style="display: none;">
     <div class="modal-box">

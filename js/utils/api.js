@@ -6,7 +6,12 @@ import { supabase } from './supabase-config.js';
 
 export { supabase };
 
-export const API_BASE = '/api';
+// Em desenvolvimento (Live Server), o backend Express roda na porta 3001.
+// Em produção (Render), o frontend é servido pelo mesmo servidor, então /api funciona.
+export const API_BASE =
+    (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+        ? 'http://localhost:3001/api'
+        : '/api';
 
 async function authHeaders() {
     const { data: { session } } = await supabase.auth.getSession();
