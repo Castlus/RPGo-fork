@@ -1,117 +1,98 @@
-# Componente Inventário
+﻿# Componente InventÃ¡rio
 
-## Estrutura
+## DescriÃ§Ã£o
+Gerencia o inventÃ¡rio do personagem: criar, editar, excluir itens; equipar/desequipar; filtrar por categoria; controle de peso. PersistÃªncia via API REST + Supabase Realtime.
 
-O componente de Inventário foi componentizado para melhor manutenção e reutilização.
+## Arquivos
+| Arquivo | Responsabilidade |
+|---|---|
+| `inventario.html` | Markup das seÃ§Ãµes, cards e modais |
+| `inventario.js` | Toda a lÃ³gica â€” exports `setupInventoryUI`, `carregarInventario` |
 
-### Arquivos do Componente
+## FunÃ§Ãµes Exportadas
 
-- **[inventario.html](inventario.html)** - Template HTML da interface do inventário
-- **[inventario.js](inventario.js)** - Lógica do componente (módulos exportados)
+### `setupInventoryUI(uid)`
+Configura a UI: abas, botÃ£o de filtro equipados, modal de criaÃ§Ã£o/ediÃ§Ã£o e seus listeners.  
+**NÃ£o** carrega dados â€” deve ser chamada antes de `carregarInventario`.
 
-## Como Usar
+### `carregarInventario(uid)`
+Faz a carga inicial dos itens e abre o canal Supabase Realtime. MantÃ©m o estado local (`inventarioState.itens`) sincronizado e chama `renderizarItens()` a cada mudanÃ§a.
 
-### Importação em outro arquivo
+**ParÃ¢metros:**
+- `uid` â€” `string` â€” ID Supabase do usuÃ¡rio
 
-```javascript
-import { setupInventoryUI, carregarInventario } from "./js/components/inventory/inventario.js";
-```
+**Fluxo de `carregarInventario`:**
+1. `apiGet(/users/${uid}/inventario)` â†’ preenche `inventarioState.itens` â†’ `renderizarItens()`
+2. Canal Supabase `inventario-${uid}` re-busca a cada `postgres_changes` na tabela `itens`
 
-### Integração no HTML
+**Listeners gerenciados por `setupInventoryUI`:**
+- BotÃ£o *Novo Item* â†’ abre `#modalItem` limpo
+- BotÃ£o *Salvar* â†’ `apiPost` (novo) ou `apiPatch` (ediÃ§Ã£o)
+- Ãcone equipar/favoritar â†’ `apiPatch(/users/${uid}/inventario/:id, { equipado | favorito })`
+- Ãcone ðŸ—‘ â†’ `apiDelete` apÃ³s confirmaÃ§Ã£o via `confirmar()`
 
-1. Adicione um container no seu HTML onde o inventário deve aparecer:
-
-```html
-<div id="inventarioContainer"></div>
-```
-
-2. Carregue o HTML do componente dinamicamente:
-
-```javascript
-async function carregarComponenteInventario() {
-    const container = document.getElementById('inventarioContainer');
-    if (container) {
-        const response = await fetch('./js/components/inventory/inventario.html');
-        const html = await response.text();
-        container.innerHTML = html;
-    }
-}
-
-await carregarComponenteInventario();
-```
-
-3. Inicialize a lógica do inventário passando o `uid` e um objeto com as funções Firebase:
-
-```javascript
-const dbRefs = { db, ref, onValue, push, remove, update };
-
-setupInventoryUI(uid, dbRefs);
-carregarInventario(uid, dbRefs);
-```
-
-## Funções Exportadas
-
-### `setupInventoryUI(uid, dbRefs)`
-Configura a interface do inventário, incluindo:
-- Abas de navegação
-- Modal de novo/edição de item
-- Listeners para botões
-
-**Parâmetros:**
-- `uid` (string): ID do usuário no Firebase
-- `dbRefs` (Object): Objeto contendo funções Firebase
-  - `ref`: função ref do Firebase
-  - `onValue`: função onValue do Firebase
-  - `push`: função push do Firebase
-  - `remove`: função remove do Firebase
-  - `update`: função update do Firebase
-
-### `carregarInventario(uid, dbRefs)`
-Carrega e exibe o inventário do usuário em tempo real.
-
-**Parâmetros:**
-- `uid` (string): ID do usuário no Firebase
-- `dbRefs` (Object): Objeto contendo funções e referências Firebase
-
-## Funcionalidades Principais
-
-- **Sistema de Favoritos**
-  - Permite marcar itens como "Destaque" clicando na estrela.
-  - Itens favoritos aparecem no topo da lista em uma seção dedicada.
-  - Recebem borda dourada e ícone de estrela preenchido.
-
-- **Categorização Automática**
-  - **Destaques**: Seção prioritária para itens favoritados.
-  - **Arsenal**: Agrupa automaticamente itens do tipo "Arma".
-  - **Armaria**: Agrupa itens do tipo "Armadura".
-  - **Mochila**: Contém itens comuns e outros objetos.
-
-- **Visualização Otimizada**
-  - **Cards Expansíveis**: Clique no card para expandir e ler descrições longas.
-  - **Ordenação**: Itens organizados alfabeticamente dentro de cada categoria.
-  - **Ocultação Inteligente**: Seções vazias são ocultadas automaticamente.
-
-- **Gerenciamento de Inventário**
-  - Criar, editar e excluir itens.
-  - Equipar/Desequipar armas e armaduras (com destaque visual).
-  - Sistema de peso e capacidade de carga com barra de progresso.
-  - Alertas visuais de sobrecarga.
-
-## Estrutura de Dados do Item
-
-```javascript
+**Estado interno (`inventarioState`):**
+```js
 {
-    nome: string,              // Nome do item
-    peso: number,              // Peso em PC
-    tipo: string,              // 'comum', 'arma', 'armadura'
-    tags: string,              // Tags separadas por vírgula
-    descricao: string,         // Descrição/efeitos
-    dano: string,              // Ex: "1d8" (apenas para armas)
-    modificador: number,       // Bônus de dano (apenas para armas)
-    equipado: boolean          // Se está equipado
+  itens: [],                       // cache local
+  mostrarEquipados: false,         // filtro ativo
+  uid: null,
+  categoriaAtual: 'section-arsenal'
 }
 ```
 
-## Exemplo de Uso Completo
+**Elementos HTML necessÃ¡rios:**
+```
+#btnNovoItem | #btnSalvarItem | #btnFecharModalItem | #modalItem
+#btnToggleEquipados
+.btn-category[data-target]        â€” botÃµes de categoria
+#newItemName | #newItemWeight | #newItemType | #newItemTags | #newItemDesc
+#newItemDamage | #newItemMod      â€” campos de arma (ocultos por default)
+#newItemAC | #newItemDexPenalty   â€” campos de armadura (ocultos por default)
+```
 
-Veja [ficha.js](../../ficha.js) e [ficha.html](../../ficha.html) para um exemplo completo de integração.
+**Para adicionar um novo tipo de item:**
+1. Adicione a opÃ§Ã£o no `<select id="newItemType">`
+2. Crie os campos especÃ­ficos no HTML e ligue-os ao `selectType.addEventListener('change')`
+3. Inclua o novo tipo na allowlist do backend (`backend/src/routes/inventario.js`)
+
+## Schema de Dados (tabela `itens`)
+```
+id           â€” UUID
+personagem_id â€” string (FK)
+nome         â€” string   â† obrigatÃ³rio
+peso         â€” float
+tipo         â€” 'comum' | 'arma' | 'armadura'
+tags         â€” string
+descricao    â€” string
+dano         â€” string   (somente arma, ex: '1d8')
+modificador  â€” int      (somente arma)
+ca           â€” int      (somente armadura)
+penalidade_des â€” int    (somente armadura)
+equipado     â€” boolean
+favorito     â€” boolean
+```
+
+## Categorias de exibiÃ§Ã£o
+| Categoria | `data-target` | CritÃ©rio |
+|---|---|---|
+| Destaques | `section-favorito` | `item.favorito === true` |
+| Arsenal | `section-arsenal` | `item.tipo === 'arma'` |
+| Armaria | `section-armaria` | `item.tipo === 'armadura'` |
+| Mochila | `section-mochila` | demais tipos |
+
+SeÃ§Ãµes vazias sÃ£o ocultadas automaticamente. A categoria ativa Ã© salva em `inventarioState.categoriaAtual`.
+
+## Uso
+```js
+import { setupInventoryUI, carregarInventario } from './js/components/inventory/inventario.js';
+
+// Chamar após carregar o HTML do componente no DOM
+setupInventoryUI(uid);
+carregarInventario(uid);
+```
+
+## Controle de Peso
+- `#valPeso` / `#maxPeso` / `#fillPeso` exibem peso total vs. `cargaMaxima` do personagem
+- `#msgSobrecarga` aparece quando peso > 50% da capacidade, muda de cor em 75% e 100%
+- `cargaMaxima` é buscada via `apiGet(/users/:uid)` ao inicializar

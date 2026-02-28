@@ -29,69 +29,39 @@
     </div>
 
     <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-        import { getDatabase, ref, set } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
-        import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+        import { supabase, apiPost } from './js/utils/api.js';
 
-        const firebaseConfig = { 
-            apiKey: "AIzaSyBkp8ZUYMCfRokbpMl2fBGTvfMxzzvgaeY",
-            authDomain: "rpgo-onepiece.firebaseapp.com",
-            databaseURL: "https://rpgo-onepiece-default-rtdb.firebaseio.com",
-            projectId: "rpgo-onepiece",
-            storageBucket: "rpgo-onepiece.firebasestorage.app",
-            messagingSenderId: "726770644982",
-            appId: "1:726770644982:web:7c06f46940cc5142c3f9d7",
-            measurementId: "G-HSBMTMB5XK"
-        };
-        
-        const app = initializeApp(firebaseConfig);
-        const db = getDatabase(app);
-        const auth = getAuth(app);
-
-        // Proteção de rota: aguarda a sessão do Firebase ser restaurada.
-        // Sem isso, auth.currentUser é null e o botão falha silenciosamente.
-        onAuthStateChanged(auth, (user) => {
-            if (!user) {
-                // Usuário não está logado — redireciona para login
-                window.location.href = 'index.html';
-                return;
-            }
-
-            document.getElementById('btnSalvarFicha').addEventListener('click', () => {
+        // Proteção de rota: usa Supabase (mesmo sistema do resto do app).
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session?.user) {
+            window.location.href = 'index.html';
+        } else {
+            document.getElementById('btnSalvarFicha').addEventListener('click', async () => {
                 const nome = document.getElementById('nome').value.trim();
                 if (!nome) {
                     alert('Dê um nome ao seu personagem!');
                     return;
                 }
 
-                const hpMax = Number(document.getElementById('hpMax').value) || 0;
-                const ppMax = Number(document.getElementById('ppMax').value) || 0;
-
-                // set() é seguro aqui pois só chegamos nesta página quando o nó
-                // do usuário ainda não existe no Firebase (verificado em auth.js).
-                set(ref(db, 'users/' + user.uid), {
-                    nome: nome,
-                    hpMax: hpMax,
-                    hpAtual: hpMax,
-                    ppMax: ppMax,
-                    ppAtual: ppMax,
-                    nivel: 1,
-                    atributos: {
+                try {
+                    await apiPost('/users', {
+                        nome,
+                        hpMax:        Number(document.getElementById('hpMax').value) || 0,
+                        ppMax:        Number(document.getElementById('ppMax').value) || 0,
                         forca:        Number(document.getElementById('forca').value) || 0,
                         destreza:     Number(document.getElementById('destreza').value) || 0,
                         constituicao: Number(document.getElementById('constituicao').value) || 0,
                         sabedoria:    Number(document.getElementById('sabedoria').value) || 0,
                         vontade:      Number(document.getElementById('vontade').value) || 0,
                         presenca:     Number(document.getElementById('presenca').value) || 0
-                    }
-                }).then(() => {
+                    });
                     window.location.href = 'ficha.html';
-                }).catch((erro) => {
+                } catch (erro) {
                     console.error('Erro ao salvar ficha:', erro);
                     alert('Erro ao salvar personagem. Tente novamente.');
-                });
+                }
             });
-        });
+        }
     </script>
 </body>
 </html>
