@@ -5,6 +5,8 @@
 import { notificar } from "../../utils/modal-utils.js";
 import { supabase, apiGet, apiPatch } from "../../utils/api.js";
 
+export { configurarTemas } from './temas.js';
+
 export function carregarPerfil(uid) {
     function renderizarDados(dados) {
         if (!dados) return;
@@ -87,32 +89,3 @@ export function carregarPerfil(uid) {
     };
 }
 
-/**
- * Configura o sistema de tema (Dark Mode)
- */
-export function configurarTema() {
-    const btnTheme = document.getElementById('btnToggleTheme');
-    const body = document.body;
-    
-    // 1. Verifica preferência salva
-    const savedTheme = localStorage.getItem('theme');
-    if (savedTheme === 'dark') {
-        body.classList.add('dark-mode');
-        btnTheme.className = "fas fa-sun";
-    }
-
-    // 2. Alternar Tema
-    if(btnTheme) {
-        btnTheme.addEventListener('click', () => {
-            body.classList.toggle('dark-mode');
-            
-            if (body.classList.contains('dark-mode')) {
-                localStorage.setItem('theme', 'dark');
-                btnTheme.className = "fas fa-sun";
-            } else {
-                localStorage.setItem('theme', 'light');
-                btnTheme.className = "fas fa-moon";
-            }
-        });
-    }
-}

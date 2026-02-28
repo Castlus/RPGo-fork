@@ -1,7 +1,7 @@
 import { supabase, apiGet, apiPatch } from './js/utils/api.js';
 import { iniciarBandeja } from "./js/components/bandeja/bandeja.js";
 import { setupInventoryUI, carregarInventario } from "./js/components/inventory/inventario.js";
-import { carregarPerfil, configurarTema } from "./js/components/profile/perfil.js";
+import { carregarPerfil, configurarTemas } from "./js/components/profile/perfil.js";
 import { carregarAcoes, setupTabsUI } from "./js/components/actions/acoes.js";
 
 // Força recarga quando a página é restaurada do bfcache (back/forward navigation)
@@ -67,22 +67,37 @@ async function carregarComponenteAcoes() {
 
 // INICIALIZAÇÃO — usa getSession() para carga única, sem re-disparos
 (async () => {
-    const { data: { session } } = await supabase.auth.getSession();
+    // ── MODO DEV ─────────────────────────────────────────────────────────────
+    // Acesse ficha.html?dev=1 no Live Server para pular login e backend.
+    // Nunca ativo em produção (hostname != localhost).
+    const isDev =
+        (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') &&
+        new URLSearchParams(window.location.search).get('dev') === '1';
 
-    if (!session?.user) {
-        window.location.href = 'index.html';
-        return;
+    let user;
+
+    if (isDev) {
+        console.warn('[DEV MODE] Autenticação e backend ignorados.');
+        user = { id: 'dev-user', email: 'dev@local.test' };
+    } else {
+        const { data: { session } } = await supabase.auth.getSession();
+
+        if (!session?.user) {
+            window.location.href = 'index.html';
+            return;
+        }
+
+        user = session.user;
+
+        // Verifica se o personagem existe; se não, redireciona para criação
+        try {
+            await apiGet(`/users/${user.id}`);
+        } catch (e) {
+            window.location.href = 'criacao-personagem.html';
+            return;
+        }
     }
-
-    const user = session.user;
-
-    // Verifica se o personagem existe; se não, redireciona para criação
-    try {
-        await apiGet(`/users/${user.id}`);
-    } catch (e) {
-        window.location.href = 'criacao-personagem.html';
-        return;
-    }
+    // ─────────────────────────────────────────────────────────────────────────
 
     // Aguarda o carregamento dos componentes HTML
     await carregarComponenteBandeja();
@@ -92,7 +107,7 @@ async function carregarComponenteAcoes() {
 
     // Inicializa componentes
     carregarPerfil(user.id);
-    configurarTema();
+    configurarTemas();
     carregarAcoes(user.id);
     setupTabsUI();
 
