@@ -7,7 +7,16 @@ const senhaInput = document.getElementById('password');
 const confirmaSenhaInput = document.getElementById('confirmPassword');
 const btnLogin = document.getElementById('btnLogin');
 const btnCriar = document.getElementById('btnCriarConta');
-const msgErro = document.getElementById('msgErro');
+
+const authToast = document.getElementById('authToast');
+const toastMessage = document.getElementById('toastMessage');
+const closeToast = document.getElementById('closeToast');
+
+if(closeToast) {
+    closeToast.addEventListener('click', () => {
+        authToast.classList.remove('show');
+    });
+}
 
 // 4. Tradução de erros Supabase → mensagens em português
 function traduzirErro(mensagem = '') {
@@ -35,8 +44,14 @@ function setLoading(ativo) {
     btnLogin.textContent = ativo ? 'Aguarde...' : 'Entrar';
 }
 
-function mostrarErro(msg) {
-    msgErro.innerText = msg;
+function mostrarErro(msg, cor = '#e74c3c') {
+    if (!msg) {
+        authToast.classList.remove('show');
+        return;
+    }
+    authToast.style.borderLeftColor = cor;
+    toastMessage.innerText = msg;
+    authToast.classList.add('show');
 }
 
 function validarCampos(...campos) {
@@ -82,16 +97,22 @@ if (btnCriar) {
         }
 
         setLoading(true);
-        const { error } = await supabase.auth.signUp({
+        const { data, error } = await supabase.auth.signUp({
             email: emailInput.value.trim(),
             password: senhaInput.value
         });
         if (error) {
             mostrarErro(traduzirErro(error.message));
             setLoading(false);
+        } else if (data?.user && !data?.session) {
+            // Conta criada, mas precisa confirmar email
+            mostrarErro('Conta criada! Verifique seu e-mail para confirmar.', 'green');
+            setLoading(false);
+        } else if (data?.session) {
+            // Em caso de signup que faz login direto, o listener cuida do redirect
+            msgErro.style.color = 'green';
+            msgErro.innerText = 'Conta criada com sucesso!';
         }
-        // Supabase envia e-mail de confirmação por padrão.
-        // Se "Confirm email" estiver desativado no projeto, onAuthStateChange dispara imediatamente.
     });
 }
 

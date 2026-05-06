@@ -93,8 +93,16 @@ async function carregarComponenteAcoes() {
         try {
             await apiGet(`/users/${user.id}`);
         } catch (e) {
-            window.location.href = 'criacao-personagem.html';
-            return;
+            // Apenas redireciona se for erro 404 (Não Encontrado).
+            // Se for 500 (Erro de banco de dados/Prisma), mostramos um alerta de falha de rede.
+            if (e.status === 404) {
+                window.location.href = 'criacao-personagem.html';
+                return;
+            } else {
+                console.error("Erro interno do servidor backend:", e.message);
+                alert("Erro de conexão com o banco de dados. Tente novamente mais tarde.");
+                return;
+            }
         }
     }
     // ─────────────────────────────────────────────────────────────────────────

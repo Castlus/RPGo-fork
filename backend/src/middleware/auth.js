@@ -19,7 +19,21 @@ export async function requireAuth(req, res, next) {
     }
 
     const token = authHeader.split(' ')[1];
-    const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
+    
+    // Tenta validar o usuário com tentativas de reconexão (Retry) caso o IPv6/Cloudflare do Supabase trave
+    let user = null;
+    let error = null;
+    for (let i = 0; i < 3; i++) {
+        try {
+            const result = await supabaseAdmin.auth.getUser(token);
+            user = result.data?.user;
+            error = result.error;
+            if (user || error?.status === 401) break; // Se validou ou se é apenas um token ruim (não erro de rede), pare de tentar
+        } catch (err) {
+            console.warn(`Tentativa ${i + 1} de comunicação com o Supabase falhou (Timeout).`);
+            if (i === 2) error = err; // Última tentativa salva o erro
+        }
+    }
 
     if (error || !user) {
         return res.status(401).json({ error: 'Token inválido ou expirado.' });

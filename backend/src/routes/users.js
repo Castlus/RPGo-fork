@@ -56,7 +56,7 @@ router.post('/', requireAuth, async (req, res) => {
 router.patch('/:uid', requireAuth, requireSelf, async (req, res) => {
     const allowed = [
         'nome', 'nivel', 'hpAtual', 'hpMax', 'ppAtual', 'ppMax',
-        'cargaMaxima', 'ultimaRolagem',
+        'cargaMaxima', 'ultimaRolagem', 'fotoUrl',
         'forca', 'destreza', 'constituicao', 'sabedoria', 'vontade', 'presenca'
     ];
 

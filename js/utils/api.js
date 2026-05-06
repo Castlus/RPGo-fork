@@ -25,7 +25,9 @@ async function authHeaders() {
 async function handleResponse(res) {
     if (!res.ok) {
         const body = await res.text();
-        throw new Error(body || `HTTP ${res.status}`);
+        const err = new Error(body || `HTTP ${res.status}`);
+        err.status = res.status;
+        throw err;
     }
     return res.json();
 }

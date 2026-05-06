@@ -23,6 +23,7 @@ datasource db {
 model Personagem {
   id            String  @id
   nome          String
+  fotoUrl       String? @map("foto_url")
   nivel         Int     @default(1)
   hpAtual       Int     @default(0)  @map("hp_atual")
   hpMax         Int     @default(0)  @map("hp_max")
