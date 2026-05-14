@@ -59,12 +59,51 @@ export function carregarPerfil(uid) {
         setAttr('attr-presenca',     dados.presenca);
     }
 
-    apiGet(`/users/${uid}`).then(renderizarDados).catch(console.error);
+    apiGet(`/personagens/${uid}`).then(renderizarDados).catch(console.error);
 
     supabase.channel(`personagem-${uid}`)
         .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'personagens', filter: `id=eq.${uid}` },
-            async () => { const d = await apiGet(`/users/${uid}`).catch(() => null); renderizarDados(d); })
+            async () => { const d = await apiGet(`/personagens/${uid}`).catch(() => null); renderizarDados(d); })
         .subscribe();
+
+    // ENTRAR EM MESA
+    const btnEntrarMesa = document.getElementById('btnEntrarMesa');
+    if (btnEntrarMesa) {
+        btnEntrarMesa.onclick = async () => {
+            const { value: codigo } = await Swal.fire({
+                title: 'Entrar em Mesa',
+                input: 'text',
+                inputLabel: 'Código de Acesso da Mesa',
+                inputPlaceholder: 'Digite o código de 6 caracteres',
+                showCancelButton: true,
+                confirmButtonColor: 'var(--primary)',
+                confirmButtonText: 'Entrar'
+            });
+
+            if (codigo) {
+                try {
+                    await apiPost('/mesas/join', {
+                        codigo: codigo.trim(),
+                        personagemId: window.personagemAtual.id
+                    });
+                    
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Sucesso',
+                        text: 'Personagem vinculado à mesa!',
+                        timer: 2000,
+                        showConfirmButton: false
+                    });
+                } catch (error) {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Erro',
+                        text: error.message || 'Código inválido ou mesa não encontrada.'
+                    });
+                }
+            }
+        };
+    }
 
     // EDITAR FICHA
     const modalFicha     = document.getElementById('modalFicha');
@@ -97,7 +136,7 @@ export function carregarPerfil(uid) {
             vontade:      Number(document.getElementById('editVon').value),
             presenca:     Number(document.getElementById('editPre').value)
         };
-        await apiPatch(`/users/${uid}`, payload)
+        await apiPatch(`/personagens/${uid}`, payload)
             .then(() => { notificar("Sucesso", "Ficha atualizada!"); modalFicha.style.display = 'none'; })
             .catch(e  => notificar("Erro", e.message));
     };
@@ -210,7 +249,7 @@ export function carregarPerfil(uid) {
                 const fotoUrl = publicData.publicUrl;
 
                 btnSalvarCrop.innerText = 'Salvando no perfil...';
-                await apiPatch(`/users/${uid}`, { fotoUrl });
+                await apiPatch(`/personagens/${uid}`, { fotoUrl });
                 notificar('Sucesso', 'Sua foto foi atualizada!');
                 
                 const elAvatar = document.getElementById('displayAvatar');

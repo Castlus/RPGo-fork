@@ -186,9 +186,9 @@ export function setupInventoryUI(uid) {
                 Object.keys(itemData).forEach(key => itemData[key] === undefined && delete itemData[key]);
 
                 if (editingItemId) {
-                    apiPatch(`/users/${uid}/inventario/${editingItemId}`, itemData).catch(console.error);
+                    apiPatch(`/personagens/${uid}/inventario/${editingItemId}`, itemData).catch(console.error);
                 } else {
-                    apiPost(`/users/${uid}/inventario`, itemData).catch(console.error);
+                    apiPost(`/personagens/${uid}/inventario`, itemData).catch(console.error);
                 }
 
                 modalItem.style.display = 'none';
@@ -207,14 +207,14 @@ export function carregarInventario(uid) {
     inventarioState.uid = uid;
 
     // Carrega Carga Máxima do personagem
-    apiGet(`/users/${uid}`).then(p => {
+    apiGet(`/personagens/${uid}`).then(p => {
         const elMax = document.getElementById('maxPeso');
         if (elMax && p?.cargaMaxima != null) elMax.innerText = p.cargaMaxima;
     }).catch(console.error);
 
     // Carga inicial dos itens
     function recarregar() {
-        apiGet(`/users/${uid}/inventario`).then(itens => {
+        apiGet(`/personagens/${uid}/inventario`).then(itens => {
             // Converte array → mapa {id: item} para compatibilidade com renderizarItens
             const mapa = {};
             (itens || []).forEach(item => { mapa[item.id] = item; });
@@ -394,7 +394,7 @@ function setupItemListeners(uid, itens) {
                 btn.style.color = !isFav ? '#d4af37' : '#ccc';
             }
             const id = e.target.getAttribute('data-id');
-            apiPatch(`/users/${uid}/inventario/${id}`, { favorito: !isFav }).catch(console.error);
+            apiPatch(`/personagens/${uid}/inventario/${id}`, { favorito: !isFav }).catch(console.error);
         });
     });
 
@@ -403,7 +403,7 @@ function setupItemListeners(uid, itens) {
             e.stopPropagation();
             const confirmado = await confirmar("Deletar Item", "Tem certeza que quer apagar este item?", "Deletar", "Cancelar");
             if (confirmado) {
-                apiDelete(`/users/${uid}/inventario/${e.target.getAttribute('data-id')}`).catch(console.error);
+                apiDelete(`/personagens/${uid}/inventario/${e.target.getAttribute('data-id')}`).catch(console.error);
             }
         });
     });
@@ -427,11 +427,11 @@ function setupItemListeners(uid, itens) {
                 // Desequipa outras armaduras antes
                 Object.entries(itens || {}).forEach(([k, v]) => {
                     if (v.tipo === 'armadura' && v.equipado) {
-                        apiPatch(`/users/${uid}/inventario/${k}`, { equipado: false }).catch(console.error);
+                        apiPatch(`/personagens/${uid}/inventario/${k}`, { equipado: false }).catch(console.error);
                     }
                 });
             }
-            apiPatch(`/users/${uid}/inventario/${id}`, { equipado: !estaEquipado }).catch(console.error);
+            apiPatch(`/personagens/${uid}/inventario/${id}`, { equipado: !estaEquipado }).catch(console.error);
         });
     });
 

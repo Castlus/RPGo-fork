@@ -35,7 +35,7 @@ export function carregarAcoes(uid) {
                     const id = e.target.getAttribute('data-id');
                     const confirmado = await confirmar("Deletar Ação", "Tem certeza que quer apagar essa técnica?", "Deletar", "Cancelar");
                     if (confirmado) {
-                        apiDelete(`/users/${uid}/acoes/${id}`).catch(console.error);
+                        apiDelete(`/personagens/${uid}/acoes/${id}`).catch(console.error);
                     }
                 });
             });
@@ -43,12 +43,12 @@ export function carregarAcoes(uid) {
     }
 
     // Carga inicial
-    apiGet(`/users/${uid}/acoes`).then(renderizarAcoes).catch(console.error);
+    apiGet(`/personagens/${uid}/acoes`).then(renderizarAcoes).catch(console.error);
 
     // Realtime
     supabase.channel(`acoes-${uid}`)
         .on('postgres_changes', { event: '*', schema: 'public', table: 'acoes', filter: `personagem_id=eq.${uid}` },
-            () => apiGet(`/users/${uid}/acoes`).then(renderizarAcoes).catch(console.error))
+            () => apiGet(`/personagens/${uid}/acoes`).then(renderizarAcoes).catch(console.error))
         .subscribe();
 
     // NOVA AÇÃO
@@ -63,7 +63,7 @@ export function carregarAcoes(uid) {
         const tag  = document.getElementById('newActionTag').value;
 
         if (nome) {
-            await apiPost(`/users/${uid}/acoes`, { nome, descricao: desc, tipo, tag }).catch(console.error);
+            await apiPost(`/personagens/${uid}/acoes`, { nome, descricao: desc, tipo, tag }).catch(console.error);
             document.getElementById('newActionName').value = "";
             document.getElementById('newActionDesc').value = "";
             document.getElementById('newActionTag').value = "";

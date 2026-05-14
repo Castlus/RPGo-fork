@@ -212,7 +212,7 @@ export function iniciarRolador(user, callbacks = {}) {
         // Salva última rolagem no perfil do usuário
         const textoLimpo = stringFinal.replace(/<[^>]*>?/gm, '');
         const prefixo = nomePreset ? `[${nomePreset}] ` : '';
-        apiPatch(`/users/${user.id}`, {
+        apiPatch(`/personagens/${user.id}`, {
             ultimaRolagem: `${prefixo}[${total}] = ${textoLimpo}`
         });
 

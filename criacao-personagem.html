@@ -51,7 +51,7 @@
     <div class="char-creation-container">
         <div class="char-creation-header">
             <h1><i class="fas fa-user-plus"></i> Nova Ficha de Personagem</h1>
-            <p style="color: var(--text-sec); font-size: 0.95rem;">Preencha os detalhes básicos do seu novo herói ou vilão.</p>
+            <p style="color: var(--text-sec); font-size: 0.95rem;">Preencha os detalhes básicos do seu novo personagem.</p>
         </div>
 
         <div class="form-section">
@@ -73,21 +73,21 @@
         </div>
 
         <div class="form-section">
-            <h3><i class="fas fa-heart"></i> Limites de Vitalidade</h3>
+            <h3><i class="fas fa-heart"></i> Barras de vitalidade</h3>
             <div class="grid-2">
                 <div class="form-group">
-                    <label>Vida Máxima (HP)</label>
+                    <label>Pontos de Vida Máximos (HP)</label>
                     <input type="number" id="hpMax" class="form-input" placeholder="Ex: 20">
                 </div>
                 <div class="form-group">
-                    <label>Pontos de Poder (PP)</label>
+                    <label>Pontos de Poder Máximos (PP)</label>
                     <input type="number" id="ppMax" class="form-input" placeholder="Ex: 10">
                 </div>
             </div>
         </div>
 
         <div class="form-section">
-            <h3><i class="fas fa-dumbbell"></i> Atributos Base</h3>
+            <h3><i class="fas fa-dumbbell"></i> Atributos</h3>
             <div class="grid-3" style="margin-top: 15px;">
                 <div class="form-group"><label>FOR</label><input type="number" id="forca" class="form-input" placeholder="0"></div>
                 <div class="form-group"><label>DES</label><input type="number" id="destreza" class="form-input" placeholder="0"></div>
@@ -125,7 +125,7 @@
                 btnSalvar.disabled = true;
 
                 try {
-                    await apiPost('/users', {
+                    await apiPost('/personagens', {
                         nome,
                         nivel:        Number(document.getElementById('nivel').value) || 1,
                         hpMax:        Number(document.getElementById('hpMax').value) || 0,

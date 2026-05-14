@@ -1,12 +1,13 @@
 import { Router } from 'express';
 import { PrismaClient } from '@prisma/client';
-import { requireAuth, requireSelf } from '../middleware/auth.js';
+import { requireAuth } from '../middleware/auth.js';
+import { requirePersonagemAccess } from './personagens.js';
 
 const router = Router({ mergeParams: true });
 const prisma = new PrismaClient();
 
 // GET /users/:uid/acoes
-router.get('/', requireAuth, requireSelf, async (req, res) => {
+router.get('/', requireAuth, requirePersonagemAccess, async (req, res) => {
     try {
         const acoes = await prisma.acao.findMany({
             where: { personagemId: req.params.uid }
@@ -18,7 +19,7 @@ router.get('/', requireAuth, requireSelf, async (req, res) => {
 });
 
 // POST /users/:uid/acoes
-router.post('/', requireAuth, requireSelf, async (req, res) => {
+router.post('/', requireAuth, requirePersonagemAccess, async (req, res) => {
     const { nome, descricao, tipo, tag } = req.body;
     if (!nome) return res.status(400).json({ error: 'Nome é obrigatório.' });
 
@@ -39,7 +40,7 @@ router.post('/', requireAuth, requireSelf, async (req, res) => {
 });
 
 // DELETE /users/:uid/acoes/:id
-router.delete('/:id', requireAuth, requireSelf, async (req, res) => {
+router.delete('/:id', requireAuth, requirePersonagemAccess, async (req, res) => {
     try {
         await prisma.acao.delete({
             where: { id: req.params.id, personagemId: req.params.uid }

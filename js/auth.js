@@ -125,5 +125,5 @@ supabase.auth.onAuthStateChange((event, session) => {
 
     redirecionando = true;
     setLoading(false);
-    window.location.href = 'ficha.html';
+    window.location.href = 'dashboard.html';
 });

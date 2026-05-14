@@ -10,7 +10,7 @@ import { supabase, apiGet, apiPost, apiDelete } from '../../utils/api.js';
 export function iniciarChat(user, SESSION_ID) {
     // Nome do personagem buscado do backend (fallback para e-mail)
     let nomePersonagem = user.email || 'Anônimo';
-    apiGet(`/users/${user.id}`).then(p => { if (p?.nome) nomePersonagem = p.nome; }).catch(() => {});
+    apiGet(`/personagens/${user.id}`).then(p => { if (p?.nome) nomePersonagem = p.nome; }).catch(() => {});
 
     let unsubscribeMensagens = null;
 

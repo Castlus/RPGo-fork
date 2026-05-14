@@ -67,45 +67,39 @@ async function carregarComponenteAcoes() {
 
 // INICIALIZAÇÃO — usa getSession() para carga única, sem re-disparos
 (async () => {
-    // ── MODO DEV ─────────────────────────────────────────────────────────────
-    // Acesse ficha.html?dev=1 no Live Server para pular login e backend.
-    // Nunca ativo em produção (hostname != localhost).
-    const isDev =
-        (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') &&
-        new URLSearchParams(window.location.search).get('dev') === '1';
-
     let user;
+    let personagemAtual = null;
+    const urlParams = new URLSearchParams(window.location.search);
+    const charId = urlParams.get('charId');
 
-    if (isDev) {
-        console.warn('[DEV MODE] Autenticação e backend ignorados.');
-        user = { id: 'dev-user', email: 'dev@local.test' };
-    } else {
-        const { data: { session } } = await supabase.auth.getSession();
+    if (!charId) {
+        window.location.href = 'dashboard.html';
+        return;
+    }
 
-        if (!session?.user) {
-            window.location.href = 'index.html';
+    const { data: { session } } = await supabase.auth.getSession();
+
+    if (!session?.user) {
+        window.location.href = 'index.html';
+        return;
+    }
+
+    user = session.user;
+
+    // Verifica se o personagem existe; se não, redireciona
+    try {
+        personagemAtual = await apiGet(`/personagens/${charId}`);
+    } catch (e) {
+        if (e.status === 404 || e.status === 403) {
+            alert("Personagem não encontrado ou acesso negado.");
+            window.location.href = 'dashboard.html';
+            return;
+        } else {
+            console.error("Erro interno do servidor backend:", e.message);
+            alert("Erro de conexão com o banco de dados. Tente novamente mais tarde.");
             return;
         }
-
-        user = session.user;
-
-        // Verifica se o personagem existe; se não, redireciona para criação
-        try {
-            await apiGet(`/users/${user.id}`);
-        } catch (e) {
-            // Apenas redireciona se for erro 404 (Não Encontrado).
-            // Se for 500 (Erro de banco de dados/Prisma), mostramos um alerta de falha de rede.
-            if (e.status === 404) {
-                window.location.href = 'criacao-personagem.html';
-                return;
-            } else {
-                console.error("Erro interno do servidor backend:", e.message);
-                alert("Erro de conexão com o banco de dados. Tente novamente mais tarde.");
-                return;
-            }
-        }
     }
-    // ─────────────────────────────────────────────────────────────────────────
 
     // Aguarda o carregamento dos componentes HTML
     await carregarComponenteBandeja();
@@ -113,28 +107,29 @@ async function carregarComponenteAcoes() {
     await carregarComponenteAcoes();
     await carregarComponenteInventario();
 
-    // Inicializa componentes
-    carregarPerfil(user.id);
+    // Inicializa componentes usando charId ao invés de user.id
+    carregarPerfil(charId);
     configurarTemas();
-    carregarAcoes(user.id);
+    carregarAcoes(charId);
     setupTabsUI();
 
-    setupInventoryUI(user.id);
-    carregarInventario(user.id);
+    setupInventoryUI(charId);
+    carregarInventario(charId);
 
-    configurarEdicao('valHp', 'hpAtual', 'maxHp', user.id);
-    configurarEdicao('valPp', 'ppAtual', 'maxPp', user.id);
-    configurarEdicao('maxPeso', 'cargaMaxima', 'null', user.id);
-    configurarEdicao('valNivel', 'nivel', 'null', user.id);
+    configurarEdicao('valHp', 'hpAtual', 'maxHp', charId);
+    configurarEdicao('valPp', 'ppAtual', 'maxPp', charId);
+    configurarEdicao('maxPeso', 'cargaMaxima', 'null', charId);
+    configurarEdicao('valNivel', 'nivel', 'null', charId);
 
-    iniciarBandeja(user);
+    // O SESSION_ID será o código de acesso da mesa, ou charId caso não tenha mesa (apenas dados próprios)
+    const sessionId = personagemAtual?.mesa?.id || charId;
+    iniciarBandeja(user, sessionId);
 
     // Logout — botão carregado dinamicamente dentro do perfil.html
     const btnSair = document.getElementById('btnSair');
     if (btnSair) {
         btnSair.addEventListener('click', async () => {
-            await supabase.auth.signOut();
-            window.location.href = 'index.html';
+            window.location.href = 'dashboard.html';
         });
     }
 
@@ -177,7 +172,7 @@ function configurarEdicao(elementoId, campoBanco, elementoMaxId, uid) {
             spanValor.innerText = novoValor;
             if (input.parentNode) input.parentNode.replaceChild(spanValor, input);
 
-            apiPatch(`/users/${uid}`, { [campoBanco]: novoValor });
+            apiPatch(`/personagens/${uid}`, { [campoBanco]: novoValor });
         };
         input.addEventListener('keydown', (e) => { if (e.key === 'Enter') { salvar(); input.blur(); } });
         input.addEventListener('blur', salvar, { once: true });
