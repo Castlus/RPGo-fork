@@ -6,6 +6,7 @@
 //   ALTER TABLE itens        REPLICA IDENTITY FULL;
 //   ALTER TABLE acoes        REPLICA IDENTITY FULL;
 //   ALTER TABLE mensagens    REPLICA IDENTITY FULL;
+//   ALTER TABLE mesas        REPLICA IDENTITY FULL;
 // E adicione cada tabela na lista de publicações do Realtime no Supabase Dashboard.
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -19,10 +20,25 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
-// Espelha os UIDs do auth.users do Supabase — nunca gera ID próprio
+model Mesa {
+  id           String       @id @default(uuid())
+  userId       String       @map("user_id") // Dono / Narrador
+  nome         String
+  codigoAcesso String       @unique @map("codigo_acesso")
+  bannerUrl    String?      @map("banner_url")
+  personagens  Personagem[]
+
+  @@map("mesas")
+}
+
 model Personagem {
-  id            String  @id
+  id            String  @id @default(uuid())
+  userId        String  @map("user_id")
+  mesaId        String? @map("mesa_id")
+  mesa          Mesa?   @relation(fields: [mesaId], references: [id], onDelete: SetNull)
+
   nome          String
+  fotoUrl       String? @map("foto_url")
   nivel         Int     @default(1)
   hpAtual       Int     @default(0)  @map("hp_atual")
   hpMax         Int     @default(0)  @map("hp_max")

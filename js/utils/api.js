@@ -9,19 +9,38 @@ export { supabase };
 const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
 export const API_BASE = isLocal ? '/api' : 'https://rpgo-backend.fly.dev/api';
 
+// Cache do token para evitar o dispendioso `getSession` em todas as requisições
+let cachedToken = null;
+
+// Escuta mudanças de estado (login/logout/refresh local)
+supabase.auth.onAuthStateChange((event, session) => {
+    cachedToken = session?.access_token || null;
+});
+
+// Força a primeira busca de token no carregamento da API
+supabase.auth.getSession().then(({ data: { session } }) => {
+    cachedToken = session?.access_token || null;
+});
+
 async function authHeaders() {
-    const { data: { session } } = await supabase.auth.getSession();
-    const token = session?.access_token;
+    // Se o token ainda não estiver em memória por causa do boot, faz um fallback
+    if (!cachedToken) {
+        const { data: { session } } = await supabase.auth.getSession();
+        cachedToken = session?.access_token || null;
+    }
+    
     return {
         'Content-Type': 'application/json',
-        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        ...(cachedToken ? { 'Authorization': `Bearer ${cachedToken}` } : {})
     };
 }
 
 async function handleResponse(res) {
     if (!res.ok) {
         const body = await res.text();
-        throw new Error(body || `HTTP ${res.status}`);
+        const err = new Error(body || `HTTP ${res.status}`);
+        err.status = res.status;
+        throw err;
     }
     return res.json();
 }

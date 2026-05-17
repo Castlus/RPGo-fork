@@ -8,8 +8,8 @@
  */
 import { iniciarRolador } from './rolador-logic.js';
 import { iniciarChat }    from './chat-logic.js';
-export function iniciarBandeja(user) {
-    const SESSION_ID = 'mesa-principal';
+export function iniciarBandeja(user, sessionId = 'mesa-principal') {
+    const SESSION_ID = sessionId;
 
 
     // =========================================================

@@ -1,10 +1,14 @@
+import dns from 'node:dns';
+dns.setDefaultResultOrder('ipv4first');
+
 import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 
-import usersRouter      from './routes/users.js';
+import personagensRouter from './routes/personagens.js';
+import mesasRouter      from './routes/mesas.js';
 import inventarioRouter from './routes/inventario.js';
 import acoesRouter      from './routes/acoes.js';
 import mensagensRouter  from './routes/mensagens.js';
@@ -25,9 +29,10 @@ app.use(cors({
 app.use(express.json());
 
 // ─── Rotas API ───────────────────────────────────────────────────────────────
-app.use('/api/users',                 usersRouter);
-app.use('/api/users/:uid/inventario', inventarioRouter);
-app.use('/api/users/:uid/acoes',      acoesRouter);
+app.use('/api/personagens',               personagensRouter);
+app.use('/api/mesas',                     mesasRouter);
+app.use('/api/personagens/:uid/inventario', inventarioRouter);
+app.use('/api/personagens/:uid/acoes',      acoesRouter);
 app.use('/api/mensagens',             mensagensRouter);
 
 // ─── Health check ────────────────────────────────────────────────────────────

@@ -30,7 +30,7 @@ export const TEMAS_PRESET = [
         icone: '🌙',
         dark: true,
         vars: {
-            '--primary':    '#8d5b36',
+            '--primary':    '#ec7e22',
             '--bg-page':    '#121212',
             '--bg-card':    '#1e1e1e',
             '--bg-surface': '#252525',
