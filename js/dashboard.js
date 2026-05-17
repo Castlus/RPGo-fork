@@ -1,4 +1,4 @@
-import { apiGet, apiPost, supabase } from './utils/api.js';
+import { apiGet, apiPost, apiDelete, supabase } from './utils/api.js';
 import { configurarTemas } from './components/profile/perfil.js';
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -16,18 +16,21 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
+    // Inicia ambas as requisições em paralelo no background imediatamente
+    const reqPersonagens = apiGet('/personagens');
+    const reqMesas = apiGet('/mesas');
+
     // Carregar Personagens
     try {
-        const personagens = await apiGet('/personagens');
-        if (personagens.length === 0) {
-            listaPersonagens.innerHTML = '<div style="color: var(--text-sec);">Você não tem personagens criados.</div>';
-        } else {
-            listaPersonagens.innerHTML = '';
+        const personagens = await reqPersonagens;
+        listaPersonagens.innerHTML = '';
+        if (personagens.length > 0) {
             personagens.forEach(p => {
                 const card = document.createElement('a');
                 card.href = `ficha.html?charId=${p.id}`;
                 card.className = 'card';
                 card.innerHTML = `
+                    <button class="btn-delete" data-id="${p.id}" data-type="personagens" title="Apagar Personagem"><i class="fa-solid fa-trash"></i></button>
                     <div class="card-banner" style="background-image: url('${p.fotoUrl || 'https://via.placeholder.com/400x200/1e1e1e/333333?text=Sem+Foto'}')"></div>
                     <div class="card-body">
                         <h3 class="card-title">${p.nome || 'Sem Nome'}</h3>
@@ -37,6 +40,18 @@ document.addEventListener('DOMContentLoaded', async () => {
                 listaPersonagens.appendChild(card);
             });
         }
+        
+        // Adiciona botão no fim da grade preenchendo o espaço
+        const btnCriarPersonagem = document.createElement('a');
+        btnCriarPersonagem.href = 'criacao-personagem.html';
+        btnCriarPersonagem.className = 'card';
+        btnCriarPersonagem.style.cssText = 'display: flex; flex-direction: column; justify-content: center; align-items: center; text-decoration: none; border: 2px dashed var(--border); background: transparent; min-height: 200px; grid-column: 1 / -1;';
+        btnCriarPersonagem.innerHTML = `
+            <i class="fas fa-plus" style="font-size: 2rem; color: var(--primary); margin-bottom: 10px;"></i>
+            <h3 class="card-title" style="margin:0;">Criar Novo Personagem</h3>
+        `;
+        listaPersonagens.appendChild(btnCriarPersonagem);
+
     } catch (e) {
         console.error(e);
         listaPersonagens.innerHTML = '<div style="color: red;">Erro ao carregar personagens.</div>';
@@ -44,17 +59,16 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Carregar Mesas
     try {
-        const mesas = await apiGet('/mesas');
-        if (mesas.length === 0) {
-            listaMesas.innerHTML = '<div style="color: var(--text-sec);">Você não é narrador de nenhuma mesa.</div>';
-        } else {
-            listaMesas.innerHTML = '';
+        const mesas = await reqMesas;
+        listaMesas.innerHTML = '';
+        if (mesas.length > 0) {
             mesas.forEach(m => {
                 const card = document.createElement('a');
                 card.href = `narrador.html?mesaId=${m.id}`;
                 card.className = 'card';
                 const bannerStyle = m.bannerUrl ? `background-image: url('${m.bannerUrl}')` : 'background-color: var(--bg-surface); display:flex; justify-content:center; align-items:center; color:var(--text-sec); font-size: 2rem;';
                 card.innerHTML = `
+                    <button class="btn-delete" data-id="${m.id}" data-type="mesas" title="Apagar Mesa"><i class="fa-solid fa-trash"></i></button>
                     <div class="card-banner" style="${bannerStyle}">
                         ${!m.bannerUrl ? '<i class="fa-solid fa-map-location-dot"></i>' : ''}
                     </div>
@@ -66,6 +80,18 @@ document.addEventListener('DOMContentLoaded', async () => {
                 listaMesas.appendChild(card);
             });
         }
+        
+        // Adiciona botão de mesa no fim da grade
+        const btnCriarMesa = document.createElement('div');
+        btnCriarMesa.id = 'btnNovaMesa';
+        btnCriarMesa.className = 'card';
+        btnCriarMesa.style.cssText = 'display: flex; flex-direction: column; justify-content: center; align-items: center; text-decoration: none; border: 2px dashed var(--border); background: transparent; min-height: 200px; cursor: pointer; grid-column: 1 / -1;';
+        btnCriarMesa.innerHTML = `
+            <i class="fas fa-plus" style="font-size: 2rem; color: var(--primary); margin-bottom: 10px;"></i>
+            <h3 class="card-title" style="margin:0;">Criar Nova Mesa</h3>
+        `;
+        listaMesas.appendChild(btnCriarMesa);
+
     } catch (e) {
         console.error(e);
         listaMesas.innerHTML = '<div style="color: red;">Erro ao carregar mesas.</div>';
@@ -104,6 +130,65 @@ document.addEventListener('DOMContentLoaded', async () => {
             document.getElementById('btnSalvarMesa').disabled = false;
             document.getElementById('btnSalvarMesa').textContent = 'Criar';
         }
+    });
+
+    // Lógica para Apagar Itens (Personagens ou Mesas)
+    document.querySelectorAll('.btn-delete').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+            e.preventDefault(); // Impede o clique de abrir a ficha/mesa
+            e.stopPropagation();
+
+            const itemId = btn.getAttribute('data-id');
+            const itemType = btn.getAttribute('data-type'); // "personagens" ou "mesas"
+            const label = itemType === 'personagens' ? 'este personagem' : 'esta mesa';
+
+            // Usando modal visual nativo SweetAlert para compatibilidade com o resto do sistema
+            const confirmacao = await Swal.fire({
+                title: 'Tem certeza?',
+                text: `Deseja apagar ${label} permanentemente? A exclusão é irreversível.`,
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#d33',
+                cancelButtonColor: '#3085d6',
+                confirmButtonText: 'Sim, apagar!',
+                cancelButtonText: 'Cancelar',
+                background: 'var(--bg-card)',
+                color: 'var(--text-main)'
+            });
+            
+            if (confirmacao.isConfirmed) {
+                try {
+                    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>'; // Loading
+                    btn.disabled = true;
+                    
+                    await apiDelete(`/${itemType}/${itemId}`);
+                    
+                    btn.closest('.card').remove();
+                    
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Apagado!',
+                        text: 'A deleção foi concluída com sucesso.',
+                        timer: 1500,
+                        showConfirmButton: false,
+                        background: 'var(--bg-card)',
+                        color: 'var(--text-main)'
+                    });
+                } catch (error) {
+                    console.error("Erro ao deletar:", error);
+                    // O erro de HTML é devolvido quando a API não encontra a rota.
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Erro de Servidor',
+                        text: 'Esta rota de exclusão ainda não existe no backend. Atualize a API.',
+                        background: 'var(--bg-card)',
+                        color: 'var(--text-main)'
+                    });
+                    btn.innerHTML = '<i class="fa-solid fa-trash"></i>';
+                    btn.disabled = false;
+                }
+            }
+        });
     });
 
 });

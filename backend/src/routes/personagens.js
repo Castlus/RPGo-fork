@@ -116,4 +116,16 @@ router.patch('/:uid', requireAuth, requirePersonagemAccess, async (req, res) => 
     }
 });
 
+// DELETE /personagens/:uid - apaga um personagem especifico
+router.delete('/:uid', requireAuth, requirePersonagemAccess, async (req, res) => {
+    try {
+        await prisma.personagem.delete({
+            where: { id: req.params.uid }
+        });
+        res.status(200).json({ message: "Personagem removido com sucesso." });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
 export default router;

@@ -122,4 +122,23 @@ router.post('/join', requireAuth, async (req, res) => {
     }
 });
 
+// DELETE /mesas/:id - apaga uma mesa
+router.delete('/:id', requireAuth, async (req, res) => {
+    try {
+        const mesa = await prisma.mesa.findUnique({ where: { id: req.params.id } });
+        if (!mesa) return res.status(404).json({ error: 'Mesa não encontrada.' });
+        
+        if (mesa.userId !== req.user.id) {
+            return res.status(403).json({ error: 'Acesso negado.' });
+        }
+
+        await prisma.mesa.delete({
+            where: { id: req.params.id }
+        });
+        res.status(200).json({ message: "Mesa removida com sucesso." });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
 export default router;

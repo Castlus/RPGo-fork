@@ -6,6 +6,8 @@
     <title>Painel | OPRPG</title>
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <!-- SweetAlert2 -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script>
         // Aplica o tema salvo antes do primeiro render (evita flash)
         (function () {
@@ -103,6 +105,31 @@
             font-size: 0.9rem;
             color: var(--text-sec);
         }
+        .btn-delete {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(220, 53, 69, 0.9);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            width: 30px;
+            height: 30px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            opacity: 0;
+            transition: all 0.2s;
+            z-index: 10;
+        }
+        .card:hover .btn-delete {
+            opacity: 1;
+        }
+        .btn-delete:hover {
+            transform: scale(1.1);
+            background: #dc3545;
+        }
         /* Modal nova mesa */
         #modalNovaMesa {
             display: none;
@@ -141,15 +168,13 @@
 
         <div class="section-title">
             <h2>Meus Personagens</h2>
-            <a href="criacao-personagem.html" class="btn-primary" style="text-decoration: none;"><i class="fas fa-plus"></i> Novo Personagem</a>
         </div>
         <div id="listaPersonagens" class="cards-grid">
             <div style="color: var(--text-sec);">Carregando personagens...</div>
         </div>
 
         <div class="section-title">
-            <h2>Minhas Mesas (Narrador)</h2>
-            <button id="btnNovaMesa" class="btn-primary"><i class="fas fa-plus"></i> Nova Mesa</button>
+            <h2>Mesas como Narrador</h2>
         </div>
         <div id="listaMesas" class="cards-grid">
             <div style="color: var(--text-sec);">Carregando mesas...</div>

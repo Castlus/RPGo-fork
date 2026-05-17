@@ -101,11 +101,13 @@ async function carregarComponenteAcoes() {
         }
     }
 
-    // Aguarda o carregamento dos componentes HTML
-    await carregarComponenteBandeja();
-    await carregarComponentePerfil();
-    await carregarComponenteAcoes();
-    await carregarComponenteInventario();
+    // Aguarda o carregamento dos componentes HTML em paralelo (drástica redução de tempo)
+    await Promise.all([
+        carregarComponenteBandeja(),
+        carregarComponentePerfil(),
+        carregarComponenteAcoes(),
+        carregarComponenteInventario()
+    ]);
 
     // Inicializa componentes usando charId ao invés de user.id
     carregarPerfil(charId);
@@ -171,6 +173,15 @@ function configurarEdicao(elementoId, campoBanco, elementoMaxId, uid) {
             if (novoValor > valorMax) novoValor = valorMax;
             spanValor.innerText = novoValor;
             if (input.parentNode) input.parentNode.replaceChild(spanValor, input);
+
+            // Atualização visual otimista das barras (vida e pp)
+            if (elementoId === 'valHp') {
+                const fill = document.getElementById('fillHp');
+                if (fill) fill.style.width = `${Math.max(0, Math.min(100, (novoValor / valorMax) * 100))}%`;
+            } else if (elementoId === 'valPp') {
+                const fill = document.getElementById('fillPp');
+                if (fill) fill.style.width = `${Math.max(0, Math.min(100, (novoValor / valorMax) * 100))}%`;
+            }
 
             apiPatch(`/personagens/${uid}`, { [campoBanco]: novoValor });
         };
