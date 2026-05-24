@@ -7,6 +7,7 @@ import { CardMesa } from "./card-mesa";
 import { BotaoNovaMesa } from "./nova-mesa";
 import { LogoutButton } from "./logout-button";
 import { RealtimeRefresher } from "./realtime-refresher";
+import { ThemeButton } from "@/components/temas/theme-button";
 import "./dashboard.css";
 
 export default async function DashboardPage() {
@@ -38,7 +39,7 @@ export default async function DashboardPage() {
           <i className="fa-solid fa-dice-d20" /> Hand Rolls
         </h1>
         <div style={{ display: "flex", gap: 15, alignItems: "center" }}>
-          {/* Switcher de tema vai na Fase 7. Por hora só o botão sair. */}
+          <ThemeButton />
           <LogoutButton />
         </div>
       </header>

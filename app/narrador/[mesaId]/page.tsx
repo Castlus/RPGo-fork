@@ -4,6 +4,8 @@ import { prisma } from "@/lib/prisma";
 import { createClient } from "@/lib/supabase/server";
 import { CopyCodigoBadge } from "./copy-codigo-badge";
 import { NarradorRealtime } from "./realtime-refresher";
+import { Bandeja } from "@/components/bandeja/bandeja";
+import { ThemeButton } from "@/components/temas/theme-button";
 import "./narrador.css";
 
 type Params = { params: Promise<{ mesaId: string }> };
@@ -40,6 +42,7 @@ export default async function NarradorPage({ params }: Params) {
           <Link href="/dashboard" className="btn-voltar">
             <i className="fas fa-arrow-left" /> Voltar
           </Link>
+          <ThemeButton />
         </div>
 
         <header className="mesa-header">
@@ -129,13 +132,11 @@ export default async function NarradorPage({ params }: Params) {
         </section>
       </div>
 
-      {/* Bandeja (chat + rolador) entra na Fase 7 */}
-      <aside className="bandeja-placeholder">
-        <div className="bandeja-placeholder-msg">
-          <i className="fas fa-dice-d20" />
-          <p>Bandeja em breve</p>
-        </div>
-      </aside>
+      <Bandeja
+        userId={user.id}
+        userName={`Narrador (${mesa.nome})`}
+        sessionId={mesa.id}
+      />
     </div>
   );
 }

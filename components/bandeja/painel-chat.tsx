@@ -1,0 +1,239 @@
+"use client";
+
+import {
+  forwardRef,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useRef,
+  useState,
+} from "react";
+import Swal from "sweetalert2";
+import { createClient } from "@/lib/supabase/client";
+import {
+  enviarMensagemTexto,
+  enviarRolagem,
+  limparMensagens,
+  listarMensagens,
+  type MensagemSerializada,
+} from "./actions";
+import type { ResultadoRolagem } from "@/lib/dice";
+
+export type PainelChatHandle = {
+  enviarRolagem: (r: ResultadoRolagem, nomePreset: string | null) => void;
+};
+
+type Props = {
+  userId: string;
+  userName: string;
+  sessionId: string;
+  ativo: boolean;
+};
+
+export const PainelChat = forwardRef<PainelChatHandle, Props>(function PainelChat(
+  { userId, userName, sessionId, ativo },
+  ref,
+) {
+  const [mensagens, setMensagens] = useState<MensagemSerializada[]>([]);
+  const [texto, setTexto] = useState("");
+  const containerRef = useRef<HTMLDivElement>(null);
+  const carregadoRef = useRef(false);
+
+  const recarregar = useCallback(async () => {
+    try {
+      const m = await listarMensagens(sessionId);
+      setMensagens(m);
+    } catch (e) {
+      console.error(e);
+    }
+  }, [sessionId]);
+
+  // Carga inicial + realtime quando o painel fica ativo pela primeira vez.
+  useEffect(() => {
+    if (!ativo) return;
+    if (!carregadoRef.current) {
+      carregadoRef.current = true;
+      recarregar();
+    }
+    const supabase = createClient();
+    const channel = supabase
+      .channel(`chat-${sessionId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "mensagens",
+          filter: `session_id=eq.${sessionId}`,
+        },
+        () => recarregar(),
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [ativo, sessionId, recarregar]);
+
+  // Auto-scroll quando chegam mensagens novas.
+  useEffect(() => {
+    const el = containerRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [mensagens]);
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      enviarRolagem: (r, nomePreset) => {
+        enviarRolagem(sessionId, userName, {
+          total: r.total,
+          detalhes: r.detalhes,
+          modificador: r.modificador,
+          nomePreset,
+        }).catch((e) => console.error(e));
+      },
+    }),
+    [sessionId, userName],
+  );
+
+  async function enviar() {
+    const t = texto.trim();
+    if (!t) return;
+
+    if (t.toLowerCase() === "/limpar") {
+      setTexto("");
+      const r = await Swal.fire({
+        title: "Apagar mensagens",
+        text: "Apagar TODAS as mensagens? Esta ação não pode ser desfeita.",
+        icon: "warning",
+        showCancelButton: true,
+        confirmButtonText: "Apagar",
+        cancelButtonText: "Cancelar",
+        background: "var(--bg-card)",
+        color: "var(--text-main)",
+      });
+      if (r.isConfirmed) {
+        try {
+          await limparMensagens(sessionId);
+        } catch (e) {
+          Swal.fire({
+            icon: "error",
+            title: "Erro",
+            text: e instanceof Error ? e.message : "Erro ao apagar.",
+            background: "var(--bg-card)",
+            color: "var(--text-main)",
+          });
+        }
+      }
+      return;
+    }
+
+    try {
+      await enviarMensagemTexto(sessionId, userName, t);
+      setTexto("");
+    } catch (e) {
+      Swal.fire({
+        icon: "error",
+        title: "Erro",
+        text: e instanceof Error ? e.message : "Erro ao enviar.",
+        background: "var(--bg-card)",
+        color: "var(--text-main)",
+      });
+    }
+  }
+
+  return (
+    <>
+      <div className="chat-messages" ref={containerRef}>
+        {mensagens.length === 0 ? (
+          <p style={{ color: "#999", textAlign: "center", fontSize: "0.9rem" }}>
+            Nenhuma mensagem ainda...
+          </p>
+        ) : (
+          mensagens.map((m) => <MensagemView key={m.id} msg={m} meuUid={userId} />)
+        )}
+      </div>
+      <div className="chat-input-row">
+        <input
+          type="text"
+          value={texto}
+          onChange={(e) => setTexto(e.target.value)}
+          placeholder="Digite uma mensagem..."
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              enviar();
+            }
+          }}
+        />
+        <button type="button" title="Enviar" onClick={enviar}>
+          <i className="fas fa-paper-plane" />
+        </button>
+      </div>
+    </>
+  );
+});
+
+function MensagemView({
+  msg,
+  meuUid,
+}: {
+  msg: MensagemSerializada;
+  meuUid: string;
+}) {
+  const hora = new Date(msg.timestamp).toLocaleTimeString("pt-BR", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+  const nome = msg.uid === meuUid ? "Você" : msg.nome;
+
+  if (msg.tipo === "rolagem" && msg.detalhes) {
+    const raw = msg.detalhes as
+      | {
+          rolls?: Array<{ faces: number; sinal: 1 | -1; resultado: number }>;
+          nomePreset?: string | null;
+        }
+      | Array<{ faces: number; sinal: 1 | -1; resultado: number }>;
+    const arr = Array.isArray(raw) ? raw : raw.rolls || [];
+    const presetLabel = !Array.isArray(raw) ? raw.nomePreset || null : null;
+
+    let stringDados = "";
+    arr.forEach((d, i) => {
+      const op =
+        i === 0 ? (d.sinal === -1 ? "- " : "") : d.sinal === 1 ? " + " : " - ";
+      let res = `${d.resultado}`;
+      if (d.resultado === 1) res = `<span class="crit-fail">${d.resultado}</span>`;
+      else if (d.resultado === d.faces)
+        res = `<span class="crit-success">${d.resultado}</span>`;
+      stringDados += `${op}(${res}) 1d${d.faces}`;
+    });
+    if (msg.modificador && msg.modificador !== 0) {
+      stringDados += ` ${msg.modificador >= 0 ? "+" : "-"} ${Math.abs(msg.modificador)}`;
+    }
+
+    return (
+      <div className="chat-message roll-message">
+        <div className="roll-header">
+          {hora} <strong>{nome}</strong>
+        </div>
+        {presetLabel && (
+          <div className="roll-preset-tag">
+            <i className="fas fa-bookmark" /> {presetLabel}
+          </div>
+        )}
+        <div className="roll-box">
+          <div className="roll-total">{msg.total}</div>
+          <div
+            className="roll-details"
+            dangerouslySetInnerHTML={{ __html: `[${msg.total}] = ${stringDados}` }}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="chat-message">
+      {hora} <strong>{nome}</strong>: {msg.mensagem}
+    </div>
+  );
+}

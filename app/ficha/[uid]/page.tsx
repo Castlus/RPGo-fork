@@ -4,6 +4,8 @@ import { createClient } from "@/lib/supabase/server";
 import { PerfilSidebar } from "./perfil-sidebar";
 import { FichaTabs } from "./ficha-tabs";
 import { FichaRealtime } from "./realtime-refresher";
+import { Bandeja } from "@/components/bandeja/bandeja";
+import { ThemeButton } from "@/components/temas/theme-button";
 import "./ficha.css";
 
 type Params = { params: Promise<{ uid: string }> };
@@ -35,6 +37,9 @@ export default async function FichaPage({ params }: Params) {
     redirect("/dashboard");
   }
 
+  // Bandeja: sessionId = mesa quando o personagem tá numa, senão usa o próprio personagem.
+  const sessionId = personagem.mesaId || personagem.id;
+
   return (
     <div className="ficha-layout">
       <FichaRealtime personagemId={personagem.id} />
@@ -45,6 +50,15 @@ export default async function FichaPage({ params }: Params) {
         cargaMaxima={personagem.cargaMaxima}
         acoes={personagem.acoes}
         itens={personagem.itens}
+      />
+      <div className="ficha-topo-acoes">
+        <ThemeButton />
+      </div>
+      <Bandeja
+        userId={user.id}
+        userName={personagem.nome}
+        sessionId={sessionId}
+        personagemId={personagem.id}
       />
     </div>
   );

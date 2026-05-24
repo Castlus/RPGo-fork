@@ -6,6 +6,7 @@ import { TEMPLATE_GREGORIANO, TIPOS_CLIMA_DEFAULT } from "@/lib/calendario/templ
 import type { CalendarioConfig } from "@/lib/calendario/engine";
 import { CalendarioView } from "./calendario-view";
 import { CalendarioRealtime } from "./realtime-refresher";
+import { ThemeButton } from "@/components/temas/theme-button";
 import "./calendario.css";
 
 type Params = { params: Promise<{ mesaId: string }> };
@@ -115,6 +116,7 @@ export default async function CalendarioPage({ params }: Params) {
           <i className={isNarrador ? "fas fa-chess-king" : "fas fa-user"} />
           <span className="cal-page-role">{isNarrador ? "NARRADOR" : "JOGADOR"}</span>
         </div>
+        <ThemeButton />
       </div>
 
       <CalendarioView
