@@ -20,3 +20,7 @@ Thumbs.db
 # ─── VS Code ─────────────────────────────────────────────────
 .vscode/
 backend/key.env
+
+# ─── Claude (skills locais e config pessoal) ────────────────
+.claude/skills/
+.claude/settings.local.json
