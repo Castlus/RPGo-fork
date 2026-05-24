@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useTransition } from "react";
+import Swal from "sweetalert2";
 
 type Props = {
   onDelete: () => Promise<void>;
@@ -9,54 +10,62 @@ type Props = {
 
 export function DeleteButton({ onDelete, confirmText }: Props) {
   const [pending, startTransition] = useTransition();
-  const [erro, setErro] = useState<string | null>(null);
 
-  function handleClick(e: React.MouseEvent) {
+  async function handleClick(e: React.MouseEvent) {
     e.preventDefault();
     e.stopPropagation();
-    if (!confirm(confirmText)) return;
-    setErro(null);
+
+    const confirmacao = await Swal.fire({
+      title: "Tem certeza?",
+      text: confirmText,
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonColor: "#d33",
+      cancelButtonColor: "#3085d6",
+      confirmButtonText: "Sim, apagar!",
+      cancelButtonText: "Cancelar",
+      background: "var(--bg-card)",
+      color: "var(--text-main)",
+    });
+
+    if (!confirmacao.isConfirmed) return;
+
     startTransition(async () => {
       try {
         await onDelete();
+        Swal.fire({
+          icon: "success",
+          title: "Apagado!",
+          timer: 1200,
+          showConfirmButton: false,
+          background: "var(--bg-card)",
+          color: "var(--text-main)",
+        });
       } catch (err) {
-        setErro(err instanceof Error ? err.message : "Erro ao apagar.");
+        Swal.fire({
+          icon: "error",
+          title: "Erro",
+          text: err instanceof Error ? err.message : "Não foi possível apagar.",
+          background: "var(--bg-card)",
+          color: "var(--text-main)",
+        });
       }
     });
   }
 
   return (
-    <>
-      <button
-        type="button"
-        className="btn-delete"
-        title="Apagar"
-        onClick={handleClick}
-        disabled={pending}
-      >
-        {pending ? (
-          <i className="fa-solid fa-spinner fa-spin" />
-        ) : (
-          <i className="fa-solid fa-trash" />
-        )}
-      </button>
-      {erro && (
-        <div
-          style={{
-            position: "absolute",
-            top: 50,
-            right: 10,
-            background: "#e74c3c",
-            color: "white",
-            padding: "4px 8px",
-            borderRadius: 4,
-            fontSize: 11,
-            zIndex: 20,
-          }}
-        >
-          {erro}
-        </div>
+    <button
+      type="button"
+      className="btn-delete"
+      title="Apagar"
+      onClick={handleClick}
+      disabled={pending}
+    >
+      {pending ? (
+        <i className="fa-solid fa-spinner fa-spin" />
+      ) : (
+        <i className="fa-solid fa-trash" />
       )}
-    </>
+    </button>
   );
 }
