@@ -1,67 +1,70 @@
 # RPGo — Notas para o Claude
 
-Ficha de RPG online (One Piece) com chat, rolador de dados, inventário e sistema de mesas (narrador + personagens) em tempo real.
+Ficha de RPG online (One Piece) com chat, rolador de dados, inventário, calendário e sistema de mesas (narrador + personagens) em tempo real.
 
 ## Stack
-- **Frontend:** HTML/CSS/JS vanilla, ES Modules, sem framework. Servido como estático pelo próprio Express.
-- **Backend:** Node.js + Express + Prisma. ESM (`"type": "module"` em [backend/package.json](backend/package.json)).
-- **Banco/Auth/Realtime:** Supabase (Postgres + Auth + Realtime).
-- **Deploy:** intenção é Vercel (front + back co-locados). Atualmente sem deploy ativo. Não reintroduzir Fly.io, Render ou Docker.
+- **Frontend + Backend:** Next.js 16 (App Router) + React 19 + TypeScript. SSR via Server Components, mutações via Server Actions.
+- **Banco:** Postgres (Supabase) via Prisma 7 com driver adapter `@prisma/adapter-pg`.
+- **Auth + Realtime:** Supabase (`@supabase/ssr` + `@supabase/supabase-js`).
+- **Deploy:** Vercel (Next.js detectado automaticamente, sem `vercel.json`).
+- **Sem servidor Express separado.** Não reintroduzir Fly.io, Render, Docker.
 
 ## Idioma
 - Código, comentários, mensagens de erro, docs e nomes de variáveis em **português**.
-- Nomes de campos: camelCase no JS, snake_case no banco via `@map()` no Prisma.
+- Nomes de campos: camelCase no TS, snake_case no banco via `@map()` no Prisma.
 
-## Backend — padrão de rotas
-Cada recurso é um router em [backend/src/routes/](backend/src/routes/), montado em [backend/src/index.js](backend/src/index.js). Rotas atuais:
-- `/api/personagens` ([personagens.js](backend/src/routes/personagens.js))
-- `/api/mesas` ([mesas.js](backend/src/routes/mesas.js))
-- `/api/personagens/:uid/inventario` ([inventario.js](backend/src/routes/inventario.js))
-- `/api/personagens/:uid/acoes` ([acoes.js](backend/src/routes/acoes.js))
-- `/api/mensagens` ([mensagens.js](backend/src/routes/mensagens.js))
+## Convenções Next 16
+- `middleware.ts` foi **renomeado** para [proxy.ts](proxy.ts) — função exportada como `proxy`.
+- Params de rotas dinâmicas são `Promise`: `{ params: Promise<{ uid: string }> }` → `await params`.
+- Prisma 7 não aceita `url` ou `directUrl` no `schema.prisma` — vivem em [prisma.config.ts](prisma.config.ts). PrismaClient é instanciado com `new PrismaPg({ connectionString: process.env.DATABASE_URL })` adapter.
 
-Convenções:
-- **Auth:** sempre `requireAuth` (valida JWT localmente via JWKS, ver abaixo).
-- **Ownership de personagem:** rotas que recebem `:uid` (personagem) usam `requirePersonagemAccess` (exportado de [personagens.js](backend/src/routes/personagens.js)). Permite acesso ao **dono** OU ao **narrador da mesa** em que o personagem está. Injeta `req.personagemInfo` (já com `include: { mesa: true }`) pra evitar refetch.
-- **Sub-routers** (`/personagens/:uid/inventario`, `/acoes`): use `Router({ mergeParams: true })`.
-- **PATCH** usa allow-list de campos; nunca passar `req.body` direto pro Prisma.
-- **Prisma:** sempre importar `{ prisma }` de [backend/src/prisma.js](backend/src/prisma.js) (singleton). Nunca `new PrismaClient()` em route — exauriria o pool do PgBouncer.
-- **Erros:** try/catch retornando `{ error: 'mensagem em português' }`. Códigos Prisma comuns: `P2002` → 409 (unique), `P2025` → 404 (não encontrado).
-- **Ownership de registros filhos** (item, ação): incluir `personagemId: req.params.uid` no `where` do `update`/`delete` (defesa em profundidade, mesmo com `requirePersonagemAccess`).
+## Padrão de rotas (App Router)
+- Páginas em `app/<rota>/page.tsx` são Server Components — fazem auth + query Prisma direto.
+- Mutações via Server Actions em `app/<rota>/actions.ts` (`"use server"` no topo).
+- Realtime via Client Component `realtime-refresher.tsx` que assina `postgres_changes` e dispara `router.refresh()`.
+- Componentes compartilhados em [components/](components/) (ex: [bandeja/](components/bandeja/), [temas/](components/temas/)).
 
-## Auth — JWT local via JWKS
-[backend/src/middleware/auth.js](backend/src/middleware/auth.js) valida o JWT do Supabase **localmente** com a lib `jose`, baixando as chaves públicas do endpoint JWKS (`${SUPABASE_URL}/auth/v1/.well-known/jwks.json`) e cacheando em memória. **Não chamar `supabaseAdmin.auth.getUser(token)` no hot path** — é um round-trip remoto que adiciona 100-400ms (e mais com retry) em toda request.
+### Auth
+- Server: [lib/supabase/server.ts](lib/supabase/server.ts) — `createClient()` async lê cookies via `next/headers`.
+- Client: [lib/supabase/client.ts](lib/supabase/client.ts) — `createBrowserClient`.
+- Proxy: [lib/supabase/proxy.ts](lib/supabase/proxy.ts) — `updateSession` redireciona anon→`/login?next=`, logado→`/dashboard` em `/login`. Públicas: `/login`, `/auth/callback`.
+- **Não chamar `supabase.auth.getUser()` em hot path do client** — já tem proxy + Server Components fazendo isso.
 
-`req.user` tem a shape `{ id, email, role, ...payload }`. O `id` é o `auth.users.id` do Supabase (era `payload.sub` no JWT).
+### Server Actions
+- Sempre validar auth antes de Prisma (helper `autorizar()` ou `requireUser()` dentro do arquivo).
+- **PATCH:** allow-list de campos. Nunca passar input direto pro Prisma.
+- **Ownership de filhos** (item, ação): incluir `personagemId: uid` no `where` do `update`/`delete` (defesa em profundidade).
+- **revalidatePath** após mutação pra forçar refetch do RSC.
+- Para retornar a entidade criada (evitar refetch via realtime), action pode retornar o objeto serializado — ver padrão em [components/bandeja/actions.ts](components/bandeja/actions.ts).
 
-## Frontend — organização
-- Cada componente vive em `js/components/<nome>/` com `.html`, `.js`, opcional `.css` e `-DOC.md`.
-- HTTP via wrapper [js/utils/api.js](js/utils/api.js) (`apiGet/Post/Patch/Delete`) — injeta Bearer token do Supabase automaticamente. **`API_BASE` é sempre `/api` relativo** (backend co-locado).
-- Token do Supabase é cacheado em memória via `onAuthStateChange` (em [api.js](js/utils/api.js)). Não chamar `supabase.auth.getSession()` ou `getUser()` em hot path — usar o que já está cacheado ou receber via parâmetro.
-- Cliente Supabase singleton em [js/utils/supabase-config.js](js/utils/supabase-config.js).
-- **Realtime:** componentes (perfil, inventario, acoes, chat) se inscrevem em `postgres_changes` e refazem fetch ao receber update. Não fazer polling REST.
-- **Carregamento da ficha:** [ficha.js](ficha.js) carrega o personagem **uma vez** e passa como parâmetro pros componentes (`carregarPerfil(uid, personagem, user)`, `carregarInventario(uid, personagem)`, `iniciarBandeja(user, sessionId, personagem)`). Componentes só refazem fetch se o parâmetro vier vazio.
+### Prisma
+- Singleton em [lib/prisma.ts](lib/prisma.ts) cacheado em `globalThis`. Nunca `new PrismaClient()` em outro lugar — exauriria o pool do PgBouncer.
+- Erros comuns: `P2002` → 409 (unique), `P2025` → 404 (não encontrado).
 
 ## Schema / Banco
-- Schema em [backend/prisma/schema.prisma](backend/prisma/schema.prisma).
-- **Mudança importante:** `Personagem.id` é UUID auto-gerado (não é mais o UID do usuário). Quem é o dono é o campo `Personagem.userId` (referência ao `auth.users.id` do Supabase). `Personagem.mesaId` é nullable — null = sem mesa.
-- Migrations: o time usa `prisma db push` (sem pasta `migrations/`). Após mudar o schema, rodar `npm run db:push` no `backend/`.
+- Schema em [prisma/schema.prisma](prisma/schema.prisma).
+- `Personagem.id` é UUID auto-gerado; dono via `Personagem.userId` (referência ao `auth.users.id` do Supabase). `Personagem.mesaId` é nullable.
+- Migrations: usar `npm run db:push` (sem pasta `migrations/`).
 - Após criar/alterar tabela, rodar no SQL Editor do Supabase: `ALTER TABLE <t> REPLICA IDENTITY FULL` e publicar a tabela em Realtime (instruções no topo do schema).
 
+## Temas + anti-flash
+- Presets + custom em [lib/themes.ts](lib/themes.ts).
+- Script anti-flash em [app/theme-script.tsx](app/theme-script.tsx) — espelho dos presets, injetado no `<body>` antes do primeiro render. Se mudar um preset em `lib/themes.ts`, atualizar este também.
+
 ## Performance — patterns a manter
-- Backend: `compression` middleware ativo (gzip nas respostas JSON grandes — ex: `/mensagens` com até 200 itens).
-- Backend: validação JWT local (sem round-trip Supabase no hot path).
-- Backend: singleton Prisma (1 pool).
-- Frontend: 1 fetch de personagem no load da ficha, repassado pros componentes via parâmetro.
-- Frontend: token cacheado em [api.js](js/utils/api.js).
+- SSR via Server Component faz 1 query Prisma por página, sem fetch HTTP intermediário.
+- Mutações via Server Action — 1 round-trip cliente → servidor, sem REST.
+- Action que retorna a entidade criada permite **append local** no cliente, evitando double-fetch via realtime (ver chat em [components/bandeja/](components/bandeja/)).
+- Realtime listener **filtra eventos do próprio `uid`** quando o schema tem campo identificador (ex: `mensagens.uid`).
+- Lazy-create de calendário tolera `P2002` (race com outra request).
+- `Promise.all` em Server Action quando há queries independentes (ex: criar mensagem + atualizar `ultimaRolagem` no personagem).
 
 ## Não fazer
-- Não reintroduzir Firebase ([js/utils/firebase-config.js](js/utils/firebase-config.js) é órfão pendente de remoção; a migração pra Supabase já foi feita).
-- Não recriar `fly.toml`, `Dockerfile`, `render.yaml` nem workflows de deploy pra esses provedores.
-- Não commitar `.env` (gitignored em [.gitignore](.gitignore)).
-- Não passar `req.body` direto pro Prisma em updates — sempre allow-list.
-- Não criar `new PrismaClient()` em routes — sempre importar de [backend/src/prisma.js](backend/src/prisma.js).
-- Não chamar `supabaseAdmin.auth.getUser(token)` no hot path do backend — validação JWT é local.
-- Não chamar `supabase.auth.getSession()` ou `getUser()` em cada request do frontend — token tá cacheado.
-- Não duplicar `apiGet('/personagens/:uid')` em componentes da ficha — receber via parâmetro.
-- Não apontar `API_BASE` pra URL externa de backend separado — frontend e backend são co-locados.
+- Não recriar `legacy/`, `backend/`, `fly.toml`, `Dockerfile`, `render.yaml`.
+- Não criar `app/api/*` route handlers — toda I/O passa por Server Actions ou queries SSR.
+- Não commitar `.env*` (gitignored).
+- Não passar input direto pro Prisma em PATCH — sempre allow-list.
+- Não criar `new PrismaClient()` fora de [lib/prisma.ts](lib/prisma.ts).
+- Não chamar `supabase.auth.getUser()` em loop / hot path do cliente.
+- Não pollar REST — usar realtime + `router.refresh()` ou append local.
+- Não criar arquivos `*.md` ou `README` em rota nova sem pedido explícito.
