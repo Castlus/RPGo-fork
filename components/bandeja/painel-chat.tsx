@@ -27,17 +27,18 @@ type Props = {
   userId: string;
   userName: string;
   sessionId: string;
-  ativo: boolean;
+  // Mensagens pré-carregadas no SSR. PainelChat usa como estado inicial,
+  // evitando o round-trip de listarMensagens ao abrir a aba.
+  mensagensIniciais: MensagemSerializada[];
 };
 
 export const PainelChat = forwardRef<PainelChatHandle, Props>(function PainelChat(
-  { userId, userName, sessionId, ativo },
+  { userId, userName, sessionId, mensagensIniciais },
   ref,
 ) {
-  const [mensagens, setMensagens] = useState<MensagemSerializada[]>([]);
+  const [mensagens, setMensagens] = useState<MensagemSerializada[]>(mensagensIniciais);
   const [texto, setTexto] = useState("");
   const containerRef = useRef<HTMLDivElement>(null);
-  const carregadoRef = useRef(false);
 
   const recarregar = useCallback(async () => {
     try {
@@ -56,13 +57,10 @@ export const PainelChat = forwardRef<PainelChatHandle, Props>(function PainelCha
     });
   }, []);
 
-  // Carga inicial + realtime quando o painel fica ativo pela primeira vez.
+  // Realtime fica sempre ativo (não depende da aba estar visível) porque
+  // a carga inicial já veio pré-renderizada via SSR. Isso mantém o chat
+  // sincronizado mesmo quando o rolador está em foco.
   useEffect(() => {
-    if (!ativo) return;
-    if (!carregadoRef.current) {
-      carregadoRef.current = true;
-      recarregar();
-    }
     const supabase = createClient();
     const channel = supabase
       .channel(`chat-${sessionId}`)
@@ -88,7 +86,7 @@ export const PainelChat = forwardRef<PainelChatHandle, Props>(function PainelCha
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [ativo, sessionId, userId, recarregar]);
+  }, [sessionId, userId, recarregar]);
 
   // Auto-scroll quando chegam mensagens novas.
   useEffect(() => {

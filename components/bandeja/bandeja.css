@@ -6,44 +6,56 @@
   box-shadow: 0 5px 25px rgba(0, 0, 0, 0.2);
   border: 1px solid var(--border);
   z-index: 9999;
-  display: flex;
-  flex-direction: column;
-  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+  display: grid;
+  grid-template-rows: 45px minmax(0, 1fr);
+  overflow: hidden;
+  transition:
+    width 0.3s cubic-bezier(0.25, 0.8, 0.25, 1),
+    grid-template-rows 0.3s cubic-bezier(0.25, 0.8, 0.25, 1),
+    border-radius 0.3s cubic-bezier(0.25, 0.8, 0.25, 1),
+    box-shadow 0.3s cubic-bezier(0.25, 0.8, 0.25, 1),
+    border-color 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
 }
 
 .bandeja.collapsed {
-  height: 45px;
-  overflow: hidden;
+  grid-template-rows: 45px minmax(0, 0fr);
 }
 
 .bandeja.dock-bottom {
   border-radius: 12px 12px 0 0;
   bottom: 0;
 }
-.bandeja.dock-bottom.collapsed {
-  height: 45px !important;
-  overflow: hidden;
+
+.bandeja.dock-side-left {
+  border-radius: 12px;
+  left: 0;
+}
+.bandeja.dock-side-right {
+  border-radius: 12px;
+  right: 0;
 }
 
-.bandeja.dock-side {
+.bandeja.dock-float {
   border-radius: 12px;
 }
-.bandeja.dock-side.collapsed {
-  width: 50px !important;
-  height: 50px !important;
+
+.bandeja.dock-side-left.collapsed,
+.bandeja.dock-side-right.collapsed {
+  width: 50px;
+  grid-template-rows: 50px minmax(0, 0fr);
   border-radius: 50%;
-  overflow: hidden;
   border: 2px solid var(--primary);
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
 }
 
-.bandeja.dock-side.collapsed .bandeja-header {
+.bandeja.dock-side-left.collapsed .bandeja-header,
+.bandeja.dock-side-right.collapsed .bandeja-header {
   justify-content: center;
   padding: 0;
-  height: 100%;
   border-radius: 50%;
 }
-.bandeja.dock-side.collapsed .header-left {
+.bandeja.dock-side-left.collapsed .header-left,
+.bandeja.dock-side-right.collapsed .header-left {
   display: none;
 }
 
@@ -56,9 +68,7 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  height: 45px;
   user-select: none;
-  flex-shrink: 0;
   border-radius: 12px 12px 0 0;
   gap: 10px;
 }
@@ -114,11 +124,13 @@
 /* ─── Corpo ──────────────────────────────────────────────── */
 .bandeja-body {
   position: relative;
+  box-sizing: border-box;
   padding: 15px;
   background: var(--bg-surface);
   display: flex;
   flex-direction: column;
   gap: 15px;
+  min-height: 0;
   max-height: 80vh;
   overflow-y: auto;
 }
@@ -223,6 +235,16 @@ body.dark-mode .dice-grid-buttons.negative-mode .dice-btn:not(.sign-btn):hover {
   transform: translateY(4px);
   box-shadow: none;
 }
+.roll-btn:disabled {
+  background: var(--bg-button);
+  color: var(--text-sec);
+  box-shadow: none;
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+.roll-btn:disabled:active {
+  transform: none;
+}
 .roll-btn.recording {
   background: #c62828;
   box-shadow: 0 4px 0 #8e0000;
@@ -233,7 +255,7 @@ body.dark-mode .dice-grid-buttons.negative-mode .dice-btn:not(.sign-btn):hover {
   border-radius: 8px;
   padding: 15px;
   text-align: center;
-  min-height: 80px;
+  min-height: 130px;
   flex-shrink: 0;
   color: var(--text-main);
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Swal from "sweetalert2";
 import { type Dado, formulaTexto, rolarDados } from "@/lib/dice";
 import { addPreset, getPresets, removePreset, type Preset } from "@/lib/presets";
@@ -16,6 +16,12 @@ type Props = {
 
 const FACES = [4, 6, 8, 10, 12, 20, 100] as const;
 
+// Estado de exibição: ou um preview derivado de dados+mod, ou o resultado da
+// última rolagem (mantido até o usuário mexer em qualquer input).
+type Resultado =
+  | { tipo: "preview" }
+  | { tipo: "rolado"; total: number; detalhesHtml: string };
+
 export function PainelRolador({
   userId,
   userName,
@@ -26,9 +32,8 @@ export function PainelRolador({
   const [dados, setDados] = useState<Dado[]>([]);
   const [modificador, setModificador] = useState(0);
   const [negativo, setNegativo] = useState(false);
-  const [total, setTotal] = useState<string>("--");
-  const [detalhesHtml, setDetalhesHtml] = useState<string>("Selecione dados...");
   const [modoGravacao, setModoGravacao] = useState(false);
+  const [resultado, setResultado] = useState<Resultado>({ tipo: "preview" });
   const [presetsAbertos, setPresetsAbertos] = useState(false);
   const [presets, setPresets] = useState<Preset[]>([]);
   const [pedindoNome, setPedindoNome] = useState(false);
@@ -38,33 +43,40 @@ export function PainelRolador({
     setPresets(getPresets(userId));
   }, [userId]);
 
-  function atualizarPreview(novosDados: Dado[], mod: number) {
-    if (novosDados.length === 0 && mod === 0) {
-      setDetalhesHtml(modoGravacao ? "Monte a rolagem do preset..." : "Selecione dados...");
-      setTotal("--");
-      return;
+  const vazio = dados.length === 0 && modificador === 0;
+
+  const preview = useMemo(() => {
+    if (vazio) {
+      return {
+        total: "--",
+        detalhes: modoGravacao
+          ? "Monte a rolagem do preset..."
+          : "Selecione dados...",
+      };
     }
-    setDetalhesHtml(formulaTexto(novosDados, mod));
-    setTotal("??");
-  }
+    return { total: "??", detalhes: formulaTexto(dados, modificador) };
+  }, [vazio, dados, modificador, modoGravacao]);
+
+  const display =
+    resultado.tipo === "rolado"
+      ? { total: String(resultado.total), detalhes: resultado.detalhesHtml }
+      : preview;
 
   function adicionarDado(faces: number) {
-    const nd: Dado[] = [...dados, { faces, sinal: negativo ? -1 : 1 }];
-    setDados(nd);
-    atualizarPreview(nd, modificador);
+    setDados((d) => [...d, { faces, sinal: negativo ? -1 : 1 }]);
+    setResultado({ tipo: "preview" });
   }
 
   function mudarMod(v: number) {
     setModificador(v);
-    atualizarPreview(dados, v);
+    setResultado({ tipo: "preview" });
   }
 
   function limpar() {
     setDados([]);
     setModificador(0);
     setNegativo(false);
-    setTotal("--");
-    setDetalhesHtml("Bandeja limpa");
+    setResultado({ tipo: "preview" });
   }
 
   function executarRolagem(dadosUsar: Dado[], modUsar: number, nomePreset: string | null) {
@@ -86,8 +98,11 @@ export function PainelRolador({
       stringFinal += ` ${modUsar >= 0 ? "+" : "-"} ${Math.abs(modUsar)}`;
     }
 
-    setTotal(String(r.total));
-    setDetalhesHtml(`[${r.total}] = ${stringFinal}`);
+    setResultado({
+      tipo: "rolado",
+      total: r.total,
+      detalhesHtml: `[${r.total}] = ${stringFinal}`,
+    });
 
     // Uma única chamada: registra a mensagem no chat E salva ultimaRolagem no
     // personagem (em paralelo no servidor). Retorna a mensagem pra append local.
@@ -114,11 +129,8 @@ export function PainelRolador({
   }
 
   function clicarRolar() {
+    if (vazio) return;
     if (modoGravacao) {
-      if (dados.length === 0 && modificador === 0) {
-        setDetalhesHtml("Adicione ao menos um dado ou modificador!");
-        return;
-      }
       setPedindoNome(true);
       setNomePresetTmp("");
       return;
@@ -138,8 +150,7 @@ export function PainelRolador({
     setModoGravacao(false);
     setDados([]);
     setModificador(0);
-    setTotal("--");
-    setDetalhesHtml("Selecione dados...");
+    setResultado({ tipo: "preview" });
     setPresetsAbertos(true);
   }
 
@@ -148,16 +159,14 @@ export function PainelRolador({
     setDados([]);
     setModificador(0);
     setNegativo(false);
-    setTotal("--");
-    setDetalhesHtml("Monte a rolagem do preset...");
+    setResultado({ tipo: "preview" });
   }
 
   function cancelarGravacao() {
     setModoGravacao(false);
     setDados([]);
     setModificador(0);
-    setTotal("--");
-    setDetalhesHtml("Selecione dados...");
+    setResultado({ tipo: "preview" });
   }
 
   async function executarPreset(p: Preset) {
@@ -223,16 +232,17 @@ export function PainelRolador({
         type="button"
         className={"roll-btn" + (modoGravacao ? " recording" : "")}
         onClick={clicarRolar}
+        disabled={vazio}
       >
         {modoGravacao ? "SALVAR PRESET" : "ROLAR!"}
       </button>
 
       <div className="tray-result-box">
         <div style={{ fontSize: "0.8rem", color: "var(--text-sec)" }}>Resultado:</div>
-        <div style={{ fontSize: "2rem", fontWeight: 800, color: "var(--primary)" }}>{total}</div>
+        <div style={{ fontSize: "2rem", fontWeight: 800, color: "var(--primary)" }}>{display.total}</div>
         <div
           style={{ fontSize: "0.85rem", color: "var(--text-sec)", marginTop: 5 }}
-          dangerouslySetInnerHTML={{ __html: detalhesHtml }}
+          dangerouslySetInnerHTML={{ __html: display.detalhes }}
         />
       </div>
 

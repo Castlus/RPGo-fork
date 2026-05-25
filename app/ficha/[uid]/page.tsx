@@ -1,6 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { createClient } from "@/lib/supabase/server";
+import { listarMensagensSessao } from "@/lib/mensagens";
 import { PerfilSidebar } from "./perfil-sidebar";
 import { FichaTabs } from "./ficha-tabs";
 import { FichaRealtime } from "./realtime-refresher";
@@ -40,6 +41,9 @@ export default async function FichaPage({ params }: Params) {
   // Bandeja: sessionId = mesa quando o personagem tá numa, senão usa o próprio personagem.
   const sessionId = personagem.mesaId || personagem.id;
 
+  // Pré-carrega mensagens do chat no SSR pra evitar round-trip ao abrir a aba.
+  const mensagensIniciais = await listarMensagensSessao(sessionId);
+
   return (
     <div className="ficha-layout">
       <FichaRealtime personagemId={personagem.id} />
@@ -59,6 +63,7 @@ export default async function FichaPage({ params }: Params) {
         userName={personagem.nome}
         sessionId={sessionId}
         personagemId={personagem.id}
+        mensagensIniciais={mensagensIniciais}
       />
     </div>
   );

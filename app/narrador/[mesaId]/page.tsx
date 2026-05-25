@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { createClient } from "@/lib/supabase/server";
+import { listarMensagensSessao } from "@/lib/mensagens";
 import { CopyCodigoBadge } from "./copy-codigo-badge";
 import { NarradorRealtime } from "./realtime-refresher";
 import { Bandeja } from "@/components/bandeja/bandeja";
@@ -19,14 +20,18 @@ export default async function NarradorPage({ params }: Params) {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const mesa = await prisma.mesa.findUnique({
-    where: { id: mesaId },
-    include: {
-      personagens: {
-        orderBy: { nome: "asc" },
+  // Mesa + mensagens pré-carregadas em paralelo (sessionId === mesaId aqui).
+  const [mesa, mensagensIniciais] = await Promise.all([
+    prisma.mesa.findUnique({
+      where: { id: mesaId },
+      include: {
+        personagens: {
+          orderBy: { nome: "asc" },
+        },
       },
-    },
-  });
+    }),
+    listarMensagensSessao(mesaId),
+  ]);
   if (!mesa) notFound();
 
   if (mesa.userId !== user.id) {
@@ -136,6 +141,7 @@ export default async function NarradorPage({ params }: Params) {
         userId={user.id}
         userName={`Narrador (${mesa.nome})`}
         sessionId={mesa.id}
+        mensagensIniciais={mensagensIniciais}
       />
     </div>
   );

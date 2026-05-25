@@ -2,7 +2,16 @@
 
 import { prisma } from "@/lib/prisma";
 import { createClient } from "@/lib/supabase/server";
+import {
+  listarMensagensSessao,
+  serializarMensagem,
+  type MensagemSerializada,
+} from "@/lib/mensagens";
 import type { Prisma } from "@prisma/client";
+
+// Re-export do tipo pra que componentes client importem daqui sem precisar
+// conhecer @/lib/mensagens (que tem dependências server-only).
+export type { MensagemSerializada };
 
 async function requireUser() {
   const supabase = await createClient();
@@ -13,53 +22,9 @@ async function requireUser() {
   return user;
 }
 
-export type MensagemSerializada = {
-  id: string;
-  sessionId: string;
-  uid: string;
-  nome: string;
-  mensagem: string | null;
-  timestamp: string;
-  tipo: string | null;
-  total: number | null;
-  modificador: number | null;
-  detalhes: unknown;
-};
-
-function serializar(m: {
-  id: string;
-  sessionId: string;
-  uid: string;
-  nome: string;
-  mensagem: string | null;
-  timestamp: Date;
-  tipo: string | null;
-  total: number | null;
-  modificador: number | null;
-  detalhes: Prisma.JsonValue;
-}): MensagemSerializada {
-  return {
-    id: m.id,
-    sessionId: m.sessionId,
-    uid: m.uid,
-    nome: m.nome,
-    mensagem: m.mensagem,
-    timestamp: m.timestamp.toISOString(),
-    tipo: m.tipo,
-    total: m.total,
-    modificador: m.modificador,
-    detalhes: m.detalhes,
-  };
-}
-
 export async function listarMensagens(sessionId: string): Promise<MensagemSerializada[]> {
   await requireUser();
-  const lista = await prisma.mensagem.findMany({
-    where: { sessionId },
-    orderBy: { timestamp: "asc" },
-    take: 200,
-  });
-  return lista.map(serializar);
+  return listarMensagensSessao(sessionId);
 }
 
 // Retorna a mensagem criada pra que o cliente faça append local imediato e
@@ -81,7 +46,7 @@ export async function enviarMensagemTexto(
       tipo: "texto",
     },
   });
-  return serializar(nova);
+  return serializarMensagem(nova);
 }
 
 type RolagemPayload = {
@@ -126,7 +91,7 @@ export async function registrarRolagem(
       : Promise.resolve(null);
 
   const [nova] = await Promise.all([criar, atualizarPersonagem]);
-  return serializar(nova);
+  return serializarMensagem(nova);
 }
 
 export async function limparMensagens(sessionId: string): Promise<void> {
